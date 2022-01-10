@@ -36,30 +36,6 @@ def quaternion_to_rotation(q_r, q_i, q_j, q_k):
     return rotation_mat
 
 
-def quaternion_rotate_vector(quat: np.quaternion, v: np.array) -> np.array:
-    r"""Rotates a vector by a quaternion
-
-    Args:
-        quaternion: The quaternion to rotate by
-        v: The vector to rotate
-
-    Returns:
-        np.array: The rotated vector
-    """
-    vq = np.quaternion(0, 0, 0, 0)
-    vq.imag = v
-    return (quat * vq * quat.inverse()).imag
-
-
-def quaternion_from_coeff(coeffs: np.ndarray) -> np.quaternion:
-    r"""Creates a quaternions from coeffs in [x, y, z, w] format
-    """
-    quat = np.quaternion(0, 0, 0, 0)
-    quat.real = coeffs[3]
-    quat.imag = coeffs[0:3]
-    return quat
-
-
 def cartesian_to_polar(x, y):
     rho = np.sqrt(x ** 2 + y ** 2)
     phi = np.arctan2(y, x)
@@ -70,3 +46,19 @@ def compute_pixel_coverage(instance_seg, object_id):
     cand_mask = instance_seg == object_id
     score = cand_mask.sum().astype(np.float64) / cand_mask.size
     return score
+
+
+def get_angle(x, y):
+    """
+    Gets the angle between two vectors in radians.
+    """
+    if np.linalg.norm(x) != 0:
+        x_norm = x / np.linalg.norm(x)
+    else:
+        x_norm = x
+
+    if np.linalg.norm(y) != 0:
+        y_norm = y / np.linalg.norm(y)
+    else:
+        y_norm = y
+    return np.arccos(np.clip(np.dot(x_norm, y_norm), -1, 1))

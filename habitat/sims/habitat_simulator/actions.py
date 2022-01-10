@@ -11,7 +11,7 @@ import attr
 
 import habitat_sim
 from habitat.core.registry import registry
-from habitat.core.simulator import ActionSpaceConfiguration, Config
+from habitat.core.simulator import ActionSpaceConfiguration
 from habitat.core.utils import Singleton
 
 
@@ -22,7 +22,6 @@ class _DefaultHabitatSimActions(Enum):
     TURN_RIGHT = 3
     LOOK_UP = 4
     LOOK_DOWN = 5
-    FOUND=6
 
 
 @attr.s(auto_attribs=True, slots=True)
@@ -34,7 +33,7 @@ class HabitatSimActionsSingleton(metaclass=Singleton):
     be removed nor can their mapping be altered. This also ensures that all
     actions are always contigously mapped in :py:`[0, len(HabitatSimActions) - 1]`
 
-    This accesible as the global singleton `HabitatSimActions`
+    This accesible as the global singleton :ref:`HabitatSimActions`
     """
 
     _known_actions: Dict[str, int] = attr.ib(init=False, factory=dict)
@@ -44,7 +43,7 @@ class HabitatSimActionsSingleton(metaclass=Singleton):
             self._known_actions[action.name] = action.value
 
     def extend_action_space(self, name: str) -> int:
-        r"""Extends the action space to accomodate a new action with
+        r"""Extends the action space to accommodate a new action with
         the name :p:`name`
 
         :param name: The name of the new action
@@ -173,5 +172,30 @@ class HabitatSimPyRobotActionSpaceConfiguration(ActionSpaceConfiguration):
             HabitatSimActions.LOOK_DOWN: habitat_sim.ActionSpec(
                 "look_down",
                 habitat_sim.ActuationSpec(amount=self.config.TILT_ANGLE),
+            ),
+            # The perfect actions are needed for the oracle planner
+            "_forward": habitat_sim.ActionSpec(
+                "move_forward",
+                habitat_sim.ActuationSpec(
+                    amount=self.config.FORWARD_STEP_SIZE
+                ),
+            ),
+            "_left": habitat_sim.ActionSpec(
+                "turn_left",
+                habitat_sim.ActuationSpec(amount=self.config.TURN_ANGLE),
+            ),
+            "_right": habitat_sim.ActionSpec(
+                "turn_right",
+                habitat_sim.ActuationSpec(amount=self.config.TURN_ANGLE),
+            ),
+        }
+
+
+@registry.register_action_space_configuration(name="velocitycontrol")
+class HabitatSimVelocityCtrlActionSpaceConfiguration(ActionSpaceConfiguration):
+    def get(self):
+        return {
+            HabitatSimActions.VELOCITY_CTRL: habitat_sim.ActionSpec(
+                "velocity_control"
             ),
         }

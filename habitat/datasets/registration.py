@@ -6,9 +6,12 @@
 
 from habitat.core.logging import logger
 from habitat.core.registry import registry
-from habitat.datasets.multi_nav import _try_register_multinavdatasetv1
+from habitat.datasets.eqa import _try_register_mp3d_eqa_dataset
 from habitat.datasets.object_nav import _try_register_objectnavdatasetv1
 from habitat.datasets.pointnav import _try_register_pointnavdatasetv1
+from habitat.datasets.rearrange import _try_register_rearrangedatasetv0
+from habitat.datasets.vln import _try_register_r2r_vln_dataset
+from habitat.datasets.multi_object_nav import _try_register_multinavdatasetv1
 
 
 def make_dataset(id_dataset, **kwargs):
@@ -16,9 +19,12 @@ def make_dataset(id_dataset, **kwargs):
     _dataset = registry.get_dataset(id_dataset)
     assert _dataset is not None, "Could not find dataset {}".format(id_dataset)
 
-    return _dataset(**kwargs)
+    return _dataset(**kwargs)  # type: ignore
 
 
-_try_register_multinavdatasetv1()
 _try_register_objectnavdatasetv1()
+_try_register_mp3d_eqa_dataset()
 _try_register_pointnavdatasetv1()
+_try_register_r2r_vln_dataset()
+_try_register_rearrangedatasetv0()
+_try_register_multinavdatasetv1()

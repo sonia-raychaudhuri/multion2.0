@@ -17,8 +17,8 @@ from habitat.core.registry import registry
 # Post that PR we would no longer need try register blocks.
 def _try_register_multinavdatasetv1():
     try:
-        from habitat.datasets.multi_nav.multi_nav_dataset import (
-            MultiNavDatasetV1,
+        from habitat.datasets.multi_object_nav.multi_object_nav_dataset import (
+            MultiObjectNavDatasetV1,
         )
 
         has_pointnav = True
@@ -27,8 +27,8 @@ def _try_register_multinavdatasetv1():
         pointnav_import_error = e
 
     if has_pointnav:
-        from habitat.datasets.multi_nav.multi_nav_dataset import (
-            MultiNavDatasetV1,
+        from habitat.datasets.multi_object_nav.multi_object_nav_dataset import (
+            MultiObjectNavDatasetV1,
         )
     else:
 
