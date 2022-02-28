@@ -4,18 +4,28 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-from typing import Optional
-
-import numpy as np
-
-from habitat.core.simulator import Simulator
-from habitat.datasets.utils import get_action_shortest_path
-from habitat.tasks.nav.nav import NavigationEpisode, NavigationGoal
-
 r"""A minimum radius of a plane that a point should be part of to be
 considered  as a target or source location. Used to filter isolated points
 that aren't part of a floor.
 """
+
+from typing import Dict, Generator, List, Optional, Sequence, Tuple, Union
+
+import numpy as np
+from numpy import float64
+
+from habitat.core.simulator import ShortestPathPoint
+from habitat.datasets.utils import get_action_shortest_path
+from habitat.tasks.nav.nav import NavigationEpisode, NavigationGoal
+
+try:
+    from habitat_sim.errors import GreedyFollowerError
+except ImportError:
+    GreedyFollower = BaseException
+try:
+    from habitat.sims.habitat_simulator.habitat_simulator import HabitatSim
+except ImportError:
+    habitat_sim = BaseException
 ISLAND_RADIUS_LIMIT = 1.5
 
 
@@ -34,8 +44,13 @@ def _ratio_sample_rate(ratio: float, ratio_threshold: float) -> float:
 
 
 def is_compatible_episode(
-    s, t, sim, near_dist, far_dist, geodesic_to_euclid_ratio
-):
+    s: Sequence[float],
+    t: Sequence[float],
+    sim: "HabitatSim",
+    near_dist: float,
+    far_dist: float,
+    geodesic_to_euclid_ratio: float,
+) -> Union[Tuple[bool, float], Tuple[bool, int]]:
     euclid_dist = np.power(np.power(np.array(s) - np.array(t), 2).sum(0), 0.5)
     if np.abs(s[1] - t[1]) > 0.5:  # check height difference to assure s and
         #  t are from same floor
@@ -57,14 +72,14 @@ def is_compatible_episode(
 
 
 def _create_episode(
-    episode_id,
-    scene_id,
-    start_position,
-    start_rotation,
-    target_position,
-    shortest_paths=None,
-    radius=None,
-    info=None,
+    episode_id: Union[int, str],
+    scene_id: str,
+    start_position: List[float],
+    start_rotation: List[Union[int, float64]],
+    target_position: List[float],
+    shortest_paths: Optional[List[List[ShortestPathPoint]]] = None,
+    radius: Optional[float] = None,
+    info: Optional[Dict[str, float]] = None,
 ) -> Optional[NavigationEpisode]:
     goals = [NavigationGoal(position=target_position, radius=radius)]
     return NavigationEpisode(
@@ -79,7 +94,7 @@ def _create_episode(
 
 
 def generate_pointnav_episode(
-    sim: Simulator,
+    sim: "HabitatSim",
     num_episodes: int = -1,
     is_gen_shortest_path: bool = True,
     shortest_path_success_distance: float = 0.2,
@@ -88,7 +103,7 @@ def generate_pointnav_episode(
     furthest_dist_limit: float = 30,
     geodesic_to_euclid_min_ratio: float = 1.1,
     number_retries_per_target: int = 10,
-) -> NavigationEpisode:
+) -> Generator[NavigationEpisode, None, None]:
     r"""Generator function that generates PointGoal navigation episodes.
 
     An episode is trivial if there is an obstacle-free, straight line between
@@ -127,7 +142,7 @@ def generate_pointnav_episode(
         if sim.island_radius(target_position) < ISLAND_RADIUS_LIMIT:
             continue
 
-        for retry in range(number_retries_per_target):
+        for _retry in range(number_retries_per_target):
             source_position = sim.sample_navigable_point()
 
             is_compatible, dist = is_compatible_episode(
@@ -138,26 +153,32 @@ def generate_pointnav_episode(
                 far_dist=furthest_dist_limit,
                 geodesic_to_euclid_ratio=geodesic_to_euclid_min_ratio,
             )
+            if is_compatible:
+                break
         if is_compatible:
             angle = np.random.uniform(0, 2 * np.pi)
             source_rotation = [0, np.sin(angle / 2), 0, np.cos(angle / 2)]
 
             shortest_paths = None
             if is_gen_shortest_path:
-                shortest_paths = [
-                    get_action_shortest_path(
-                        sim,
-                        source_position=source_position,
-                        source_rotation=source_rotation,
-                        goal_position=target_position,
-                        success_distance=shortest_path_success_distance,
-                        max_episode_steps=shortest_path_max_steps,
-                    )
-                ]
+                try:
+                    shortest_paths = [
+                        get_action_shortest_path(
+                            sim,
+                            source_position=source_position,
+                            source_rotation=source_rotation,
+                            goal_position=target_position,
+                            success_distance=shortest_path_success_distance,
+                            max_episode_steps=shortest_path_max_steps,
+                        )
+                    ]
+                # Throws an error when it can't find a path
+                except GreedyFollowerError:
+                    continue
 
             episode = _create_episode(
                 episode_id=episode_count,
-                scene_id=sim.config.SCENE,
+                scene_id=sim.habitat_config.SCENE,
                 start_position=source_position,
                 start_rotation=source_rotation,
                 target_position=target_position,

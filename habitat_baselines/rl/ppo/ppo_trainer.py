@@ -474,12 +474,14 @@ class PPOTrainerNO(BaseRLTrainerNonOracle):
                 }
 
                 if len(metrics) > 0:
-                    writer.add_scalar("metrics/distance_to_currgoal", metrics["distance_to_currgoal"], count_steps)
-                    writer.add_scalar("metrics/success", metrics["success"], count_steps)
-                    writer.add_scalar("metrics/sub_success", metrics["sub_success"], count_steps)
+                    writer.add_scalar("metrics/distance_to_current_object_goal", metrics["distance_to_current_object_goal"], count_steps)
+                    writer.add_scalar("metrics/multiON_success", metrics["multiON_success"], count_steps)
+                    writer.add_scalar("metrics/current_goal_success", metrics["current_goal_success"], count_steps)
                     writer.add_scalar("metrics/episode_length", metrics["episode_length"], count_steps)
                     writer.add_scalar("metrics/distance_to_multi_goal", metrics["distance_to_multi_goal"], count_steps)
-                    writer.add_scalar("metrics/percentage_success", metrics["percentage_success"], count_steps)
+                    writer.add_scalar("metrics/progress", metrics["progress"], count_steps)
+                    writer.add_scalar("metrics/multiON_spl", metrics["multiON_spl"], count_steps)
+                    writer.add_scalar("metrics/multiON_ppl", metrics["multiON_ppl"], count_steps)
 
                 writer.add_scalar("train/losses_value", value_loss, count_steps)
                 writer.add_scalar("train/losses_policy", action_loss, count_steps)
@@ -762,14 +764,14 @@ class PPOTrainerNO(BaseRLTrainerNonOracle):
         )
 
         metrics = {k: v for k, v in aggregated_stats.items() if k != "reward"}
-        writer.add_scalar("eval/distance_to_currgoal", metrics["distance_to_currgoal"], step_id)
-        writer.add_scalar("eval/distance_to_multi_goal", metrics["distance_to_multi_goal"], step_id)
+        writer.add_scalar("eval/distance_to_current_object_goal", metrics["distance_to_current_object_goal"], step_id)
+        writer.add_scalar("eval/multiON_success", metrics["multiON_success"], step_id)
+        writer.add_scalar("eval/current_goal_success", metrics["current_goal_success"], step_id)
         writer.add_scalar("eval/episode_length", metrics["episode_length"], step_id)
-        writer.add_scalar("eval/mspl", metrics["mspl"], step_id)
-        writer.add_scalar("eval/pspl", metrics["pspl"], step_id)
-        writer.add_scalar("eval/percentage_success", metrics["percentage_success"], step_id)
-        writer.add_scalar("eval/success", metrics["success"], step_id)
-        writer.add_scalar("eval/sub_success", metrics["sub_success"], step_id)
+        writer.add_scalar("eval/distance_to_multi_goal", metrics["distance_to_multi_goal"], step_id)
+        writer.add_scalar("eval/progress", metrics["progress"], step_id)
+        writer.add_scalar("eval/multiON_spl", metrics["multiON_spl"], step_id)
+        writer.add_scalar("eval/multiON_ppl", metrics["multiON_ppl"], step_id)
 
         ##Dump metrics JSON
         if 'RAW_METRICS' in config.TASK_CONFIG.TASK.MEASUREMENTS:
@@ -777,6 +779,8 @@ class PPOTrainerNO(BaseRLTrainerNonOracle):
                 os.mkdir(config.TENSORBOARD_DIR_EVAL +'/metrics')
             with open(config.TENSORBOARD_DIR_EVAL +'/metrics/' + checkpoint_path.split('/')[-1] + '.json', 'w') as fp:
                 json.dump(raw_metrics_episodes, fp)
+            with open(config.TENSORBOARD_DIR_EVAL +'/metrics/' + checkpoint_path.split('/')[-1] + '_overall.json', 'w') as fp:
+                json.dump(aggregated_stats, fp)
 
         self.envs.close()
 
@@ -1290,12 +1294,14 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 }
 
                 if len(metrics) > 0:
-                    writer.add_scalar("metrics/distance_to_currgoal", metrics["distance_to_currgoal"], count_steps)
-                    writer.add_scalar("metrics/success", metrics["success"], count_steps)
-                    writer.add_scalar("metrics/sub_success", metrics["sub_success"], count_steps)
+                    writer.add_scalar("metrics/distance_to_current_object_goal", metrics["distance_to_current_object_goal"], count_steps)
+                    writer.add_scalar("metrics/multiON_success", metrics["multiON_success"], count_steps)
+                    writer.add_scalar("metrics/current_goal_success", metrics["current_goal_success"], count_steps)
                     writer.add_scalar("metrics/episode_length", metrics["episode_length"], count_steps)
                     writer.add_scalar("metrics/distance_to_multi_goal", metrics["distance_to_multi_goal"], count_steps)
-                    writer.add_scalar("metrics/percentage_success", metrics["percentage_success"], count_steps)
+                    writer.add_scalar("metrics/progress", metrics["progress"], count_steps)
+                    writer.add_scalar("metrics/multiON_spl", metrics["multiON_spl"], count_steps)
+                    writer.add_scalar("metrics/multiON_ppl", metrics["multiON_ppl"], count_steps)
 
                 writer.add_scalar("train/losses_value", value_loss, count_steps)
                 writer.add_scalar("train/losses_policy", action_loss, count_steps)
@@ -1546,15 +1552,14 @@ class PPOTrainerO(BaseRLTrainerOracle):
         )
 
         metrics = {k: v for k, v in aggregated_stats.items() if k != "reward"}
-        writer.add_scalar("eval/distance_to_currgoal", metrics["distance_to_currgoal"], step_id)
-        writer.add_scalar("eval/distance_to_multi_goal", metrics["distance_to_multi_goal"], step_id)
+        writer.add_scalar("eval/distance_to_current_object_goal", metrics["distance_to_current_object_goal"], step_id)
+        writer.add_scalar("eval/multiON_success", metrics["multiON_success"], step_id)
+        writer.add_scalar("eval/current_goal_success", metrics["current_goal_success"], step_id)
         writer.add_scalar("eval/episode_length", metrics["episode_length"], step_id)
-        writer.add_scalar("eval/mspl", metrics["mspl"], step_id)
-        writer.add_scalar("eval/pspl", metrics["pspl"], step_id)
-        writer.add_scalar("eval/percentage_success", metrics["percentage_success"], step_id)
-        writer.add_scalar("eval/success", metrics["success"], step_id)
-        writer.add_scalar("eval/sub_success", metrics["sub_success"], step_id)
-        writer.add_scalar("eval/pspl", metrics["pspl"], step_id)
+        writer.add_scalar("eval/distance_to_multi_goal", metrics["distance_to_multi_goal"], step_id)
+        writer.add_scalar("eval/progress", metrics["progress"], step_id)
+        writer.add_scalar("eval/multiON_spl", metrics["multiON_spl"], step_id)
+        writer.add_scalar("eval/multiON_ppl", metrics["multiON_ppl"], step_id)
 
         
 
@@ -1564,6 +1569,8 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 os.mkdir(config.TENSORBOARD_DIR_EVAL +'/metrics')
             with open(config.TENSORBOARD_DIR_EVAL + '/metrics/' + checkpoint_path.split('/')[-1] + '.json', 'w') as fp:
                 json.dump(raw_metrics_episodes, fp)
+            with open(config.TENSORBOARD_DIR_EVAL + '/metrics/' + checkpoint_path.split('/')[-1] + '_overall.json', 'w') as fp:
+                json.dump(aggregated_stats, fp)
 
         # if not os.path.exists(config.TENSORBOARD_DIR_EVAL +'/traj_metrics'):
         #     os.mkdir(config.TENSORBOARD_DIR_EVAL +'/traj_metrics')

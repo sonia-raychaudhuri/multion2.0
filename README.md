@@ -24,24 +24,24 @@ This code is tested on python 3.6.10, pytorch v1.4.0 and CUDA V9.1.85.
 
 Install pytorch from https://pytorch.org/ according to your machine configuration.
 
-This code uses older versions of [habitat-sim](https://github.com/facebookresearch/habitat-sim) and [habitat-lab](https://github.com/facebookresearch/habitat-lab). Install them by running the following commands:
+This code uses latest versions of [habitat-sim](https://github.com/facebookresearch/habitat-sim) and [habitat-lab](https://github.com/facebookresearch/habitat-lab). Install them by following instructions at the respective web-sites. 
 
-#### Installing habitat-sim:
+#### Installing habitat-sim (via conda):
 
+##### For headless machines with GPU
 ```
-git clone https://github.com/facebookresearch/habitat-sim.git
-cd habitat-sim 
-git checkout ae6ba1cdc772f7a5dedd31cbf9a5b77f6de3ff0f
-pip install -r requirements.txt; 
-python setup.py install --headless # (for headless machines with GPU)
-python setup.py install # (for machines with display attached)
+conda install habitat-sim headless -c conda-forge -c aihabitat 
+```
+
+##### For machines with attached display
+```
+conda install habitat-sim -c conda-forge -c aihabitat
 ```
 
 #### Installing habitat-lab:
 ```
 git clone --branch stable https://github.com/facebookresearch/habitat-lab.git
 cd habitat-lab
-git checkout 676e593b953e2f0530f307bc17b6de66cff2e867
 pip install -e .
 ```
 
@@ -79,8 +79,8 @@ cd datasets
 wget -O multinav.zip "http://aspis.cmpt.sfu.ca/projects/multion/multinav.zip"
 unzip multinav.zip && rm multinav.zip
 cd ../
-wget -O objects.zip "http://aspis.cmpt.sfu.ca/projects/multion/objects.zip"
-unzip objects.zip && rm objects.zip
+wget -O multiON_objects.zip "http://aspis.cmpt.sfu.ca/projects/multion/multiON_objects.zip"
+unzip multiON_objects.zip && rm multiON_objects.zip
 wget -O default.phys_scene_config.json "http://aspis.cmpt.sfu.ca/projects/multion/default.phys_scene_config.json"
 cd ../
 mkdir oracle_maps

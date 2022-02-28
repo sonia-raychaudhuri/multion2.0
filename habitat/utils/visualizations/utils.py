@@ -103,6 +103,7 @@ def images_to_video(
     video_name: str,
     fps: int = 10,
     quality: Optional[float] = 5,
+    verbose: bool = True,
     **kwargs,
 ):
     r"""Calls imageio to run FFMPEG on a list of images. For more info on
@@ -130,7 +131,11 @@ def images_to_video(
         **kwargs,
     )
     logger.info(f"Video created: {os.path.join(output_dir, video_name)}")
-    for im in tqdm.tqdm(images):
+    if verbose:
+        images_iter = tqdm.tqdm(images)
+    else:
+        images_iter = images
+    for im in images_iter:
         writer.append_data(im)
     writer.close()
 
@@ -150,6 +155,45 @@ def draw_collision(view: np.ndarray, alpha: float = 0.4) -> np.ndarray:
     mask = mask == 1
     view[mask] = (alpha * np.array([255, 0, 0]) + (1.0 - alpha) * view)[mask]
     return view
+
+
+def tile_images(render_obs_images: List[np.ndarray]) -> np.ndarray:
+    """Tiles multiple images of non-equal size to a single image. Images are
+    tiled into columns making the returned image wider than tall.
+    """
+    # Get the images in descending order of vertical height.
+    render_obs_images = sorted(
+        render_obs_images, key=lambda x: x.shape[0], reverse=True
+    )
+    img_cols = [[render_obs_images[0]]]
+    max_height = render_obs_images[0].shape[0]
+    cur_y = 0.0
+    # Arrange the images in columns with the largest image to the left.
+    col = []
+    for im in render_obs_images[1:]:
+        if cur_y + im.shape[0] <= max_height:
+            col.append(im)
+            cur_y += im.shape[0]
+        else:
+            img_cols.append(col)
+            col = [im]
+            cur_y = im.shape[0]
+    img_cols.append(col)
+    col_widths = [max(col_ele.shape[1] for col_ele in col) for col in img_cols]
+    # Get the total width of all the columns put together.
+    total_width = sum(col_widths)
+
+    # Tile the images, pasting the columns side by side.
+    final_im = np.zeros(
+        (max_height, total_width, 3), dtype=render_obs_images[0].dtype
+    )
+    cur_x = 0
+    for i in range(len(img_cols)):
+        next_x = cur_x + col_widths[i]
+        total_col_im = np.concatenate(img_cols[i], axis=0)
+        final_im[: total_col_im.shape[0], cur_x:next_x] = total_col_im
+        cur_x = next_x
+    return final_im
 
 def draw_subsuccess(view: np.ndarray, alpha: float = 0.6) -> np.ndarray:
     r"""Draw translucent blue strips on the border of input view to indicate
@@ -185,7 +229,6 @@ def draw_found(view: np.ndarray, alpha: float = 1) -> np.ndarray:
     return view
 
 def observations_to_image(observation: Dict, projected_features: np.ndarray, egocentric_projection: np.ndarray, global_map: np.ndarray, info: Dict, action: np.ndarray) -> np.ndarray:
-# def observations_to_image(observation: Dict, info: Dict, action: np.ndarray) -> np.ndarray:
     r"""Generate image of single frame from observation and info
     returned from a single environment step().
 
@@ -283,9 +326,8 @@ def observations_to_image(observation: Dict, projected_features: np.ndarray, ego
         frame = np.concatenate((egocentric_view, top_down_map), axis=1)
     return frame
 
-
 def append_text_to_image(image: np.ndarray, text: str):
-    r""" Appends text underneath an image of size (height, width, channels).
+    r"""Appends text underneath an image of size (height, width, channels).
     The returned image has white text on a black background. Uses textwrap to
     split long text into multiple lines.
     Args:

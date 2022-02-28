@@ -47,9 +47,9 @@ _C.EVAL.USE_CKPT_CONFIG = True
 # REINFORCEMENT LEARNING (RL) ENVIRONMENT CONFIG
 # -----------------------------------------------------------------------------
 _C.RL = CN()
-_C.RL.REWARD_MEASURE = "distance_to_currgoal"
-_C.RL.SUCCESS_MEASURE = "success"
-_C.RL.SUBSUCCESS_MEASURE = "sub_success"
+_C.RL.REWARD_MEASURE = "distance_to_current_object_goal"
+_C.RL.SUCCESS_MEASURE = "multiON_success"
+_C.RL.SUBSUCCESS_MEASURE = "current_goal_success"
 _C.RL.SUCCESS_REWARD = 10.0
 _C.RL.SLACK_REWARD = -0.01
 _C.RL.OBJECT_CATEGORY_EMBEDDING_SIZE = 32
