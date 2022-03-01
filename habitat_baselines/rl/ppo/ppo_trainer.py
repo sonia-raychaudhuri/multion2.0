@@ -1747,15 +1747,15 @@ class PPOTrainer(BaseRLTrainer):
         self.envs = construct_envs(
             config,
             get_env_class(config.ENV_NAME),
-            workers_ignore_signals=is_slurm_batch_job(),
+            #workers_ignore_signals=is_slurm_batch_job(),
         )
 
     def _init_train(self):
         if self.config.RL.DDPPO.force_distributed:
             self._is_distributed = True
 
-        if is_slurm_batch_job():
-            add_signal_handlers()
+        """ if is_slurm_batch_job():
+            add_signal_handlers() """
 
         if self._is_distributed:
             local_rank, tcp_store = init_distrib_slurm(

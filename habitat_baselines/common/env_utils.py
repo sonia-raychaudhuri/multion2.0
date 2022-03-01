@@ -9,7 +9,7 @@ import random
 from typing import Type, Union
 
 import habitat
-from habitat import Config, Env, RLEnv, VectorEnv, ThreadedVectorEnv, make_dataset
+from habitat import Config, Env, RLEnv, VectorEnv, ThreadedVectorEnv, make_dataset, logger
 
 
 def make_env_fn(
@@ -107,6 +107,7 @@ def construct_envs(
         proc_config.freeze()
         configs.append(proc_config)
 
+    logger.info(f"In construct_envs with {num_processes} processes. workers_ignore_signals={workers_ignore_signals}")
     envs = habitat.VectorEnv(
         make_env_fn=make_env_fn,
         env_fn_args=tuple(tuple(zip(configs, env_classes))),

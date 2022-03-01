@@ -10,7 +10,7 @@ TENSORBOARD_DIR_EVAL: "tb/baseline_gru/cyl/eval"
 VIDEO_DIR: "video_dir"
 TEST_EPISODE_COUNT: -1
 EVAL_CKPT_PATH_DIR: "model_checkpoints/baseline_gru/cyl"
-NUM_ENVIRONMENTS: 24
+NUM_PROCESSES: 16
 CHECKPOINT_FOLDER: "checkpoints/baseline_gru/cyl"
 SENSORS: ["DEPTH_SENSOR", "RGB_SENSOR"]
 NUM_UPDATES: 270000
