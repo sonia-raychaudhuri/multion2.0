@@ -42,15 +42,16 @@ _C.ENVIRONMENT.ITERATOR_OPTIONS.STEP_REPETITION_RANGE = 0.2
 # -----------------------------------------------------------------------------
 # TASK
 # -----------------------------------------------------------------------------
+_C.TRAINER_NAME = ""
 # -----------------------------------------------------------------------------
 # # NAVIGATION TASK
 # -----------------------------------------------------------------------------
 _C.TASK = CN()
-_C.TASK.TYPE = "Nav-v0"
+_C.TASK.TYPE = "MultiObjectNav-v1"
 _C.TASK.SUCCESS_DISTANCE = 0.2
 _C.TASK.SENSORS = []
-_C.TASK.MEASUREMENTS = []
-_C.TASK.GOAL_SENSOR_UUID = "pointgoal"
+_C.TASK.MEASUREMENTS = ['DISTANCE_TO_GOAL','DISTANCE_TO_CURRENT_OBJECT_GOAL', 'CURRENT_GOAL_SUCCESS', 'PROGRESS', 'MULTION_SUCCESS', 'MULTION_PPL', 'MULTION_SPL']
+_C.TASK.GOAL_SENSOR_UUID = "multiobjectgoal"
 _C.TASK.POSSIBLE_ACTIONS = ["STOP", "MOVE_FORWARD", "TURN_LEFT", "TURN_RIGHT"]
 # -----------------------------------------------------------------------------
 # # ACTIONS
@@ -232,7 +233,9 @@ _C.TASK.ANSWER_ACCURACY.TYPE = "AnswerAccuracy"
 # -----------------------------------------------------------------------------
 # # MULTION TASK
 # -----------------------------------------------------------------------------
-_C.TASK.OBJECTS_PATH = "data/multion_objects"
+_C.TASK.CYL_OBJECTS_PATH = "data/multion_cyl_objects"
+_C.TASK.REAL_OBJECTS_PATH = "data/multion_real_objects"
+_C.TASK.OBJECTS_TYPE = "CYL" #"REAL" or "CYL"
 _C.TASK.ACTIONS.FOUND = CN()
 _C.TASK.ACTIONS.FOUND.TYPE = "FoundObjectAction"
 # # DISTANCE_TO_CURRENT_GOAL MEASUREMENT
@@ -504,12 +507,12 @@ _C.PYROBOT.LOCOBOT.CAMERA_ACTIONS = ["set_pan", "set_tilt", "set_pan_tilt"]
 # DATASET
 # -----------------------------------------------------------------------------
 _C.DATASET = CN()
-_C.DATASET.TYPE = "PointNav-v1"
+_C.DATASET.TYPE = "MultiObjectNav-v1"
 _C.DATASET.SPLIT = "train"
 _C.DATASET.SCENES_DIR = "data/scene_datasets"
 _C.DATASET.CONTENT_SCENES = ["*"]
 _C.DATASET.DATA_PATH = (
-    "data/datasets/pointnav/habitat-test-scenes/v1/{split}/{split}.json.gz"
+    "data/5_ON_CYL/minival/minival.json.gz" #"data/5_ON_REAL/minival/minival.json.gz"
 )
 
 # -----------------------------------------------------------------------------

@@ -326,7 +326,7 @@ class BaselineNetNonOracle(Net):
             if bs != 18:
                 self.full_global_map[bs:, :, :, :] = self.full_global_map[bs:, :, :, :] * 0
             if torch.cuda.is_available():
-                with torch.cuda.device(1):
+                with torch.cuda.device(self.device):
                     agent_view = torch.cuda.FloatTensor(bs, self.global_map_depth, self.global_map_size, self.global_map_size).fill_(0)
             else:
                 agent_view = torch.FloatTensor(bs, self.global_map_depth, self.global_map_size, self.global_map_size).to(self.device).fill_(0)
@@ -370,7 +370,7 @@ class BaselineNetNonOracle(Net):
             return x, rnn_hidden_states, final_retrieval.permute(0, 2, 3, 1)
         else: 
             global_map = global_map * masks.unsqueeze(1).unsqueeze(1)  ##verify
-            with torch.cuda.device(1):
+            with torch.cuda.device(self.device):
                 agent_view = torch.cuda.FloatTensor(bs, self.global_map_depth, 51, 51).fill_(0)
             agent_view[:, :, 
                 51//2 - math.floor(self.egocentric_map_size/2):51//2 + math.ceil(self.egocentric_map_size/2), 
@@ -424,9 +424,12 @@ class BaselineNetOracle(Net):
         self.action_embedding = nn.Embedding(4, previous_action_embedding_size)
 
         if self.use_previous_action:
-            self.state_encoder = RNNStateEncoder(
+            """ self.state_encoder = RNNStateEncoder(
                 (self._hidden_size) + object_category_embedding_size + 
                 previous_action_embedding_size, self._hidden_size,
+            ) """
+            self.state_encoder = RNNStateEncoder(
+                832, self._hidden_size,
             )
         else:
             self.state_encoder = RNNStateEncoder(
@@ -474,3 +477,88 @@ class BaselineNetOracle(Net):
             x = torch.cat(x, dim=1)
         x, rnn_hidden_states = self.state_encoder(x, rnn_hidden_states, masks)
         return x, rnn_hidden_states  
+
+class Policy(nn.Module, metaclass=abc.ABCMeta):
+    def __init__(self, net, dim_actions, policy_config=None):
+        super().__init__()
+        self.net = net
+        self.dim_actions = dim_actions
+
+        if policy_config is None:
+            self.action_distribution_type = "categorical"
+        else:
+            self.action_distribution_type = (
+                policy_config.action_distribution_type
+            )
+
+        if self.action_distribution_type == "categorical":
+            self.action_distribution = CategoricalNet(
+                self.net.output_size, self.dim_actions
+            )
+        elif self.action_distribution_type == "gaussian":
+            self.action_distribution = GaussianNet(
+                self.net.output_size,
+                self.dim_actions,
+                policy_config.ACTION_DIST,
+            )
+        else:
+            ValueError(
+                f"Action distribution {self.action_distribution_type}"
+                "not supported."
+            )
+
+        self.critic = CriticHead(self.net.output_size)
+
+    def forward(self, *x):
+        raise NotImplementedError
+
+    def act(
+        self,
+        observations,
+        rnn_hidden_states,
+        prev_actions,
+        masks,
+        deterministic=False,
+    ):
+        features, rnn_hidden_states = self.net(
+            observations, rnn_hidden_states, prev_actions, masks
+        )
+        distribution = self.action_distribution(features)
+        value = self.critic(features)
+
+        if deterministic:
+            if self.action_distribution_type == "categorical":
+                action = distribution.mode()
+            elif self.action_distribution_type == "gaussian":
+                action = distribution.mean
+        else:
+            action = distribution.sample()
+
+        action_log_probs = distribution.log_probs(action)
+
+        return value, action, action_log_probs, rnn_hidden_states
+
+    def get_value(self, observations, rnn_hidden_states, prev_actions, masks):
+        features, _ = self.net(
+            observations, rnn_hidden_states, prev_actions, masks
+        )
+        return self.critic(features)
+
+    def evaluate_actions(
+        self, observations, rnn_hidden_states, prev_actions, masks, action
+    ):
+        features, rnn_hidden_states = self.net(
+            observations, rnn_hidden_states, prev_actions, masks
+        )
+        distribution = self.action_distribution(features)
+        value = self.critic(features)
+
+        action_log_probs = distribution.log_probs(action)
+        distribution_entropy = distribution.entropy()
+
+        return value, action_log_probs, distribution_entropy, rnn_hidden_states
+
+    @classmethod
+    @abc.abstractmethod
+    def from_config(cls, config, observation_space, action_space):
+        pass

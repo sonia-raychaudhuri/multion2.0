@@ -13,6 +13,7 @@ import numba
 import numpy as np
 from gym import spaces
 from scipy import ndimage
+import math
 
 from habitat.config import Config
 from habitat.core.dataset import Dataset, Episode, EpisodeIterator
@@ -22,6 +23,8 @@ from habitat.datasets import make_dataset
 from habitat.sims import make_sim
 from habitat.tasks import make_task
 from habitat.utils import profiling_wrapper
+import habitat_sim
+import magnum as mn
 
 
 class Env:
@@ -248,18 +251,42 @@ class Env:
         self.reconfigure(self._config)
         
         # Remove existing objects from last episode
-        for objid in self._sim.get_existing_object_ids():  
+        for objid in self._sim.get_existing_object_ids():
             self._sim.remove_object(objid)
 
         # Insert object here
-        object_to_datset_mapping = {'cylinder_red':0, 'cylinder_green':1, 'cylinder_blue':2,
-            'cylinder_yellow':3, 'cylinder_white':4, 'cylinder_pink':5, 'cylinder_black':6, 'cylinder_cyan':7
-        }
+        obj_type = self._config["TASK"]["OBJECTS_TYPE"]
+        if obj_type == "CYL":
+            object_to_datset_mapping = {'cylinder_red':0, 'cylinder_green':1, 'cylinder_blue':2, 'cylinder_yellow':3, 'cylinder_white':4, 'cylinder_pink':5, 'cylinder_black':6, 'cylinder_cyan':7}
+        else:
+            object_to_datset_mapping = {'guitar':0, 'electric_piano':1, 'basket_ball':2,'toy_train':3, 'teddy_bear':4, 'rocking_horse':5, 'backpack': 6, 'trolley_bag':7}
+            
+            
         for i in range(len(self.current_episode.goals)):
             current_goal = self.current_episode.goals[i].object_category
             dataset_index = object_to_datset_mapping[current_goal]
             ind = self._sim.add_object(dataset_index)
             self._sim.set_translation(np.array(self.current_episode.goals[i].position), ind)
+            
+            # random rotation only on the Y axis
+            y_rotation = mn.Quaternion.rotation(
+                mn.Rad(random.random() * 2 * math.pi), mn.Vector3(0, 1.0, 0)
+            )
+            self._sim.set_rotation(y_rotation, ind)
+            self._sim.set_object_motion_type(habitat_sim.physics.MotionType.STATIC, ind)
+
+        for i in range(len(self.current_episode.distractors)):
+            current_distractor = self.current_episode.distractors[i].object_category
+            dataset_index = object_to_datset_mapping[current_distractor]
+            ind = self._sim.add_object(dataset_index)
+            self._sim.set_translation(np.array(self.current_episode.distractors[i].position), ind)
+            
+            # random rotation only on the Y axis
+            y_rotation = mn.Quaternion.rotation(
+                mn.Rad(random.random() * 2 * math.pi), mn.Vector3(0, 1.0, 0)
+            )
+            self._sim.set_rotation(y_rotation, ind)
+            self._sim.set_object_motion_type(habitat_sim.physics.MotionType.STATIC, ind)
 
         observations = self.task.reset(episode=self.current_episode)
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
@@ -292,7 +319,7 @@ class Env:
 
             patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40,:]
             patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False)
-            observations["semMap"] = patch[40-25:40+25, 40-25:40+25, :]
+            #observations["semMap"] = patch[40-25:40+25, 40-25:40+25, :]
         return observations
 
     def _update_step_stats(self) -> None:
@@ -352,7 +379,7 @@ class Env:
                 patch = self.currMap
             patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40,:]
             patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False)
-            observations["semMap"] = patch[40-25:40+25, 40-25:40+25, :]
+            #observations["semMap"] = patch[40-25:40+25, 40-25:40+25, :]
 
         ##Terminates episode if wrong found is called
         if self.task.is_found_called == True and \

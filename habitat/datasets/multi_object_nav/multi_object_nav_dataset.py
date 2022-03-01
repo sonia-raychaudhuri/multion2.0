@@ -59,5 +59,6 @@ class MultiObjectNavDatasetV1(PointNavDatasetV1):
                 episode.scene_id = os.path.join(scenes_dir, episode.scene_id)
 
             episode.goals = [MultiObjectGoal(**i) for i in episode.goals]
+            episode.distractors = [MultiObjectGoal(**i) for i in episode.distractors]
 
             self.episodes.append(episode)

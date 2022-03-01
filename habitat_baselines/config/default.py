@@ -36,6 +36,9 @@ _C.NUM_UPDATES = 10000
 _C.LOG_INTERVAL = 10
 _C.LOG_FILE = "train.log"
 _C.CHECKPOINT_INTERVAL = 50
+_C.TOTAL_NUM_STEPS = -1.0
+_C.FORCE_BLIND_POLICY = False
+_C.VERBOSE = True
 # -----------------------------------------------------------------------------
 # EVAL CONFIG
 # -----------------------------------------------------------------------------
@@ -76,6 +79,11 @@ _C.RL.PPO.tau = 0.95
 _C.RL.PPO.reward_window_size = 50
 _C.RL.PPO.use_normalized_advantage = True
 _C.RL.PPO.hidden_size = 512
+# Use double buffered sampling, typically helps
+# when environment time is similar or large than
+# policy inference time during rollout generation
+# Not that this does not change the memory requirements
+_C.RL.PPO.use_double_buffered_sampler = False
 # -----------------------------------------------------------------------------
 # MAPS
 # -----------------------------------------------------------------------------
@@ -103,6 +111,8 @@ _C.RL.DDPPO.pretrained_encoder = False
 _C.RL.DDPPO.train_encoder = True
 # Whether or not to reset the critic linear layer
 _C.RL.DDPPO.reset_critic = True
+# Forces distributed mode for testing
+_C.RL.DDPPO.force_distributed = False
 # -----------------------------------------------------------------------------
 # ORBSLAM2 BASELINE
 # -----------------------------------------------------------------------------
@@ -132,6 +142,16 @@ _C.ORBSLAM2.NUM_ACTIONS = 3
 _C.ORBSLAM2.DIST_TO_STOP = 0.05
 _C.ORBSLAM2.PLANNER_MAX_STEPS = 500
 _C.ORBSLAM2.DEPTH_DENORM = get_task_config().SIMULATOR.DEPTH_SENSOR.MAX_DEPTH
+# -----------------------------------------------------------------------------
+# PROFILING
+# -----------------------------------------------------------------------------
+_C.PROFILING = CN()
+_C.PROFILING.CAPTURE_START_STEP = -1
+_C.PROFILING.NUM_STEPS_TO_CAPTURE = -1
+
+
+_C.register_renamed_key
+
 
 
 def get_config(
