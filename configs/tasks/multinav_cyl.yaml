@@ -47,6 +47,6 @@ TASK:
 
 DATASET:
   TYPE: MultiObjectNav-v1
-  SPLIT: minival
+  SPLIT: train
   SCENES_DIR: "data/scene_datasets/"
-  DATA_PATH: "data/5_ON_CYL_minival/minival/minival.json.gz"
+  DATA_PATH: "data/5_ON_CYL_{split}/{split}/{split}.json.gz"
