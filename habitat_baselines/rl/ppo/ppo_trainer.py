@@ -2153,7 +2153,7 @@ class PPOTrainer(BaseRLTrainer):
 
     @rank0_only
     def _training_log(
-        self, writer, losses: Dict[str, float], lr_scheduler, prev_time: int = 0
+        self, writer, losses: Dict[str, float], value_loss, action_loss, lr_scheduler, prev_time: int = 0
     ):
         deltas = {
             k: (
@@ -2179,6 +2179,32 @@ class PPOTrainer(BaseRLTrainer):
             "train/learning_rate", lr_scheduler._last_lr[0], self.num_steps_done
         )
         
+        total_actions = self.rollouts.actions.shape[0] * self.rollouts.actions.shape[1]
+        total_found_actions = int(torch.sum(self.rollouts.actions == 0).cpu().numpy())
+        total_forward_actions = int(torch.sum(self.rollouts.actions == 1).cpu().numpy())
+        total_left_actions = int(torch.sum(self.rollouts.actions == 2).cpu().numpy())
+        total_right_actions = int(torch.sum(self.rollouts.actions == 3).cpu().numpy())
+        total_look_up_actions = int(torch.sum(self.rollouts.actions == 4).cpu().numpy())
+        total_look_down_actions = int(torch.sum(self.rollouts.actions == 5).cpu().numpy())
+        
+        writer.add_scalar(
+            "train/found_action_prob", total_found_actions/total_actions, self.num_steps_done
+        )
+        writer.add_scalar(
+            "train/forward_action_prob", total_forward_actions/total_actions, self.num_steps_done
+        )
+        writer.add_scalar(
+            "train/left_action_prob", total_left_actions/total_actions, self.num_steps_done
+        )
+        writer.add_scalar(
+            "train/right_action_prob", total_right_actions/total_actions, self.num_steps_done
+        )
+        writer.add_scalar(
+            "train/look_up_action_prob", total_look_up_actions/total_actions, self.num_steps_done
+        )
+        writer.add_scalar(
+            "train/look_down_action_prob", total_look_down_actions/total_actions, self.num_steps_done
+        )
         # Check to see if there are any metrics
         # that haven't been logged yet
         metrics = {
@@ -2188,6 +2214,19 @@ class PPOTrainer(BaseRLTrainer):
         }
         if len(metrics) > 0:
             writer.add_scalars("metrics", metrics, self.num_steps_done)
+         
+        if len(metrics) > 0:
+            writer.add_scalar("metrics/distance_to_current_object_goal", metrics["distance_to_current_object_goal"], self.num_steps_done)
+            writer.add_scalar("metrics/multiON_success", metrics["multiON_success"], self.num_steps_done)
+            writer.add_scalar("metrics/current_goal_success", metrics["current_goal_success"], self.num_steps_done)
+            writer.add_scalar("metrics/episode_length", metrics["episode_length"], self.num_steps_done)
+            writer.add_scalar("metrics/distance_to_multi_goal", metrics["distance_to_multi_goal"], self.num_steps_done)
+            writer.add_scalar("metrics/progress", metrics["progress"], self.num_steps_done)
+            writer.add_scalar("metrics/multiON_spl", metrics["multiON_spl"], self.num_steps_done)
+            writer.add_scalar("metrics/multiON_ppl", metrics["multiON_ppl"], self.num_steps_done)
+
+        writer.add_scalar("train/losses_value", value_loss, self.num_steps_done)
+        writer.add_scalar("train/losses_policy", action_loss, self.num_steps_done)
 
         # log stats
         if self.num_updates_done % self.config.LOG_INTERVAL == 0:
@@ -2372,7 +2411,7 @@ class PPOTrainer(BaseRLTrainer):
                     count_steps_delta,
                 )
 
-                self._training_log(writer, losses, lr_scheduler, prev_time)
+                self._training_log(writer, losses, value_loss, action_loss, lr_scheduler, prev_time)
 
                 # checkpoint model
                 if rank0_only() and self.should_checkpoint():
