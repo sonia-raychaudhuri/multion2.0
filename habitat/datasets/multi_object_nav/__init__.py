@@ -32,7 +32,7 @@ def _try_register_multinavdatasetv1():
         )
     else:
 
-        @registry.register_dataset(name="MultiNav-v1")
+        @registry.register_dataset(name="MultiObjectNav-v1")
         class MultiNavDatasetImportError(Dataset):
             def __init__(self, *args, **kwargs):
                 raise pointnav_import_error

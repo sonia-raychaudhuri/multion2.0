@@ -3,7 +3,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
-
+import contextlib
 from habitat_baselines.rl.ppo.ppo import PPONonOracle
 import json
 import os
@@ -2153,7 +2153,7 @@ class PPOTrainer(BaseRLTrainer):
 
     @rank0_only
     def _training_log(
-        self, writer, losses: Dict[str, float], prev_time: int = 0
+        self, writer, losses: Dict[str, float], lr_scheduler, prev_time: int = 0
     ):
         deltas = {
             k: (
@@ -2165,12 +2165,20 @@ class PPOTrainer(BaseRLTrainer):
         }
         deltas["count"] = max(deltas["count"], 1.0)
 
-        writer.add_scalar(
-            "reward",
-            deltas["reward"] / deltas["count"],
+        writer.add_scalars(
+            "losses",
+            losses,
             self.num_steps_done,
         )
+        
+        writer.add_scalar(
+            "train/reward", deltas["reward"] / deltas["count"], self.num_steps_done
+        )
 
+        writer.add_scalar(
+            "train/learning_rate", lr_scheduler._last_lr[0], self.num_steps_done
+        )
+        
         # Check to see if there are any metrics
         # that haven't been logged yet
         metrics = {
@@ -2180,12 +2188,6 @@ class PPOTrainer(BaseRLTrainer):
         }
         if len(metrics) > 0:
             writer.add_scalars("metrics", metrics, self.num_steps_done)
-
-        writer.add_scalars(
-            "losses",
-            losses,
-            self.num_steps_done,
-        )
 
         # log stats
         if self.num_updates_done % self.config.LOG_INTERVAL == 0:
@@ -2370,7 +2372,7 @@ class PPOTrainer(BaseRLTrainer):
                     count_steps_delta,
                 )
 
-                self._training_log(writer, losses, prev_time)
+                self._training_log(writer, losses, lr_scheduler, prev_time)
 
                 # checkpoint model
                 if rank0_only() and self.should_checkpoint():
