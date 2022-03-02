@@ -14,7 +14,9 @@ import torch
 from habitat.config import Config
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.config.default import get_config
-
+from habitat_baselines.nonlearning_agents import (
+    evaluate_agent,
+)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -52,6 +54,10 @@ def execute_exp(config: Config, run_type: str) -> None:
     torch.manual_seed(config.TASK_CONFIG.SEED)
     if config.FORCE_TORCH_SINGLE_THREADED and torch.cuda.is_available():
         torch.set_num_threads(1)
+
+    if run_type == "eval" and config.EVAL.EVAL_NONLEARNING:
+        evaluate_agent(config)
+        return
 
     trainer_init = baseline_registry.get_trainer(config.TRAINER_NAME)
     assert trainer_init is not None, f"{config.TRAINER_NAME} is not supported"

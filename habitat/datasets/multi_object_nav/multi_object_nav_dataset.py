@@ -47,6 +47,8 @@ class MultiObjectNavDatasetV1(PointNavDatasetV1):
             return
 
         for i, episode in enumerate(deserialized["episodes"]):
+            episode['object_index'] = 0 ##Shivansh why does this exist
+            episode["current_goal_index"] = 0
             episode = MultiObjectGoalNavEpisode(**episode)
             episode.episode_id = str(i)
 

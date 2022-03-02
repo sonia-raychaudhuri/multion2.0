@@ -353,10 +353,12 @@ class Env:
             self._episode_over is False
         ), "Episode over, call reset before calling step"
 
+        self.task.is_found_called = bool(action == 0)
+        
         # Support simpler interface as well
         if isinstance(action, (str, int, np.integer)):
             action = {"action": action}
-
+            
         observations = self.task.step(
             action=action, episode=self.current_episode
         )
@@ -387,6 +389,12 @@ class Env:
             "current_goal_success"
         ].get_metric() == 0:
             self.task._is_episode_active = False
+        
+        ##Terminates episode if all goals are found
+        if self.task.is_found_called == True and \
+            self.task.current_goal_index == len(self.current_episode.goals):
+            self.task._is_episode_active = False
+            
         self._update_step_stats()
 
         return observations

@@ -112,6 +112,7 @@ _C.TASK.OBJECTGOAL_SENSOR.GOAL_SPEC_MAX_VAL = 50
 # -----------------------------------------------------------------------------
 _C.TASK.MULTI_OBJECT_GOAL_SENSOR = CN()
 _C.TASK.MULTI_OBJECT_GOAL_SENSOR.TYPE = "MultiObjectGoalSensor"
+_C.TASK.MULTI_OBJECT_GOAL_SENSOR.GOAL_SPEC = "TASK_CATEGORY_ID"
 _C.TASK.MULTI_OBJECT_GOAL_SENSOR.GOAL_SPEC_MAX_VAL = 50
 # -----------------------------------------------------------------------------
 # IMAGEGOAL SENSOR
@@ -242,6 +243,7 @@ _C.TASK.ACTIONS.FOUND.TYPE = "FoundObjectAction"
 # -----------------------------------------------------------------------------
 _C.TASK.DISTANCE_TO_CURRENT_OBJECT_GOAL = CN()
 _C.TASK.DISTANCE_TO_CURRENT_OBJECT_GOAL.TYPE = "DistanceToCurrentObjectGoal"
+_C.TASK.DISTANCE_TO_CURRENT_OBJECT_GOAL.DISTANCE_TO = "POINT"
 # -----------------------------------------------------------------------------
 # # DISTANCE_TO_MULTI_GOAL MEASUREMENT
 # -----------------------------------------------------------------------------
@@ -253,7 +255,7 @@ _C.TASK.DISTANCE_TO_MULTI_GOAL.DISTANCE_TO = "POINT"
 # -----------------------------------------------------------------------------
 _C.TASK.CURRENT_GOAL_SUCCESS = CN()
 _C.TASK.CURRENT_GOAL_SUCCESS.TYPE = "CurrentGoalSuccess"
-_C.TASK.CURRENT_GOAL_SUCCESS.SUCCESS_DISTANCE = 0.2
+_C.TASK.CURRENT_GOAL_SUCCESS.SUCCESS_DISTANCE = 1.0
 # -----------------------------------------------------------------------------
 # # PROGRESS MEASUREMENT
 # -----------------------------------------------------------------------------

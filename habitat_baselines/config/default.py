@@ -39,6 +39,15 @@ _C.CHECKPOINT_INTERVAL = 50
 _C.TOTAL_NUM_STEPS = -1.0
 _C.FORCE_BLIND_POLICY = False
 _C.VERBOSE = True
+# For our use case, the CPU side things are mainly memory copies
+# and nothing of substantive compute. PyTorch has been making
+# more and more memory copies parallel, but that just ends up
+# slowing those down dramatically and reducing our perf.
+# This forces it to be single threaded.  The default
+# value is left as false as it's different than how
+# PyTorch normally behaves, but all configs we provide
+# set it to true and yours likely should too
+_C.FORCE_TORCH_SINGLE_THREADED = False
 # -----------------------------------------------------------------------------
 # EVAL CONFIG
 # -----------------------------------------------------------------------------
