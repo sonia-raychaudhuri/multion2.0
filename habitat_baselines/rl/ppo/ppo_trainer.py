@@ -2179,7 +2179,7 @@ class PPOTrainer(BaseRLTrainer):
             "train/learning_rate", lr_scheduler._last_lr[0], self.num_steps_done
         )
         
-        total_actions = self.rollouts.actions.shape[0] * self.rollouts.actions.shape[1]
+        """ total_actions = self.rollouts.actions.shape[0] * self.rollouts.actions.shape[1]
         total_found_actions = int(torch.sum(self.rollouts.actions == 0).cpu().numpy())
         total_forward_actions = int(torch.sum(self.rollouts.actions == 1).cpu().numpy())
         total_left_actions = int(torch.sum(self.rollouts.actions == 2).cpu().numpy())
@@ -2204,7 +2204,7 @@ class PPOTrainer(BaseRLTrainer):
         )
         writer.add_scalar(
             "train/look_down_action_prob", total_look_down_actions/total_actions, self.num_steps_done
-        )
+        ) """
         # Check to see if there are any metrics
         # that haven't been logged yet
         metrics = {
