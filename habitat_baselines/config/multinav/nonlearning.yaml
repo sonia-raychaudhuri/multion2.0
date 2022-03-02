@@ -1,0 +1,20 @@
+BASE_TASK_CONFIG_PATH: "configs/tasks/multinav_cyl.yaml"
+ENV_NAME: "NavRLEnv"
+VIDEO_OPTION: []  # options: "disk", "tensorboard"
+VIDEO_DIR: evaluations/test/videos
+RESULTS_DIR: evaluations/test
+
+EVAL:
+    SPLIT: minival
+    # any num greater than the actual episode count evals every episode
+    EPISODE_COUNT: 10000
+    EVAL_NONLEARNING: True
+    NONLEARNING:
+        AGENT: OracleAgent
+
+INFERENCE:
+    SPLIT: minival
+    PREDICTIONS_FILE: predictions.json
+    INFERENCE_NONLEARNING: True
+    NONLEARNING:
+        AGENT: OracleAgent
