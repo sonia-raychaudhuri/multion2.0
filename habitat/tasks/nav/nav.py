@@ -198,7 +198,7 @@ class PointGoalSensor(Sensor):
             in cartesian or polar coordinates.
         _dimensionality: number of dimensions used to specify the goal
     """
-
+    cls_uuid: str = "pointgoal"
     def __init__(
         self, *args: Any, sim: Simulator, config: Config, **kwargs: Any
     ):
@@ -213,7 +213,7 @@ class PointGoalSensor(Sensor):
         super().__init__(config=config)
 
     def _get_uuid(self, *args: Any, **kwargs: Any):
-        return "pointgoal"
+        return self.cls_uuid
 
     def _get_sensor_type(self, *args: Any, **kwargs: Any):
         return SensorTypes.PATH
@@ -293,8 +293,10 @@ class IntegratedPointGoalGPSAndCompassSensor(PointGoalSensor):
         _dimensionality: number of dimensions used to specify the goal
     """
 
+    cls_uuid: str = "pointgoal_with_gps_compass"
+    
     def _get_uuid(self, *args: Any, **kwargs: Any):
-        return "pointgoal_with_gps_compass"
+        return self.cls_uuid
 
     def get_observation(
         self, *args: Any, observations, episode, **kwargs: Any
@@ -311,12 +313,14 @@ class IntegratedPointGoalGPSAndCompassSensor(PointGoalSensor):
 
 @registry.register_sensor(name="PositionSensor")
 class AgentPositionSensor(Sensor):
+    cls_uuid: str = "agent_position"
+    
     def __init__(self, sim, config, **kwargs: Any):
         self._sim = sim
         super().__init__(config=config)
 
     def _get_uuid(self, *args: Any, **kwargs: Any):
-        return "agent_position"
+        return self.cls_uuid
 
     def _get_sensor_type(self, *args: Any, **kwargs: Any):
         return SensorTypes.POSITION
@@ -344,7 +348,7 @@ class HeadingSensor(Sensor):
         sim: reference to the simulator for calculating task observations.
         config: config for the sensor.
     """
-
+    cls_uuid: str = "heading"
     def __init__(
         self, sim: Simulator, config: Config, *args: Any, **kwargs: Any
     ):
@@ -352,13 +356,13 @@ class HeadingSensor(Sensor):
         super().__init__(config=config)
 
     def _get_uuid(self, *args: Any, **kwargs: Any):
-        return "heading"
+        return self.cls_uuid
 
     def _get_sensor_type(self, *args: Any, **kwargs: Any):
         return SensorTypes.HEADING
 
     def _get_observation_space(self, *args: Any, **kwargs: Any):
-        return spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float)
+        return spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float32)
 
     def _quat_to_xy_heading(self, quat):
         direction_vector = np.array([0, 0, -1])
@@ -382,9 +386,9 @@ class EpisodicCompassSensor(HeadingSensor):
     r"""The agents heading in the coordinate frame defined by the epiosde,
     theta=0 is defined by the agents state at t=0
     """
-
+    cls_uuid: str = "compass"
     def _get_uuid(self, *args: Any, **kwargs: Any):
-        return "compass"
+        return self.cls_uuid
 
     def get_observation(
         self, *args: Any, observations, episode, **kwargs: Any
@@ -408,7 +412,7 @@ class EpisodicGPSSensor(Sensor):
     Attributes:
         _dimensionality: number of dimensions used to specify the agents position
     """
-
+    cls_uuid: str = "gps"
     def __init__(
         self, sim: Simulator, config: Config, *args: Any, **kwargs: Any
     ):
@@ -419,7 +423,7 @@ class EpisodicGPSSensor(Sensor):
         super().__init__(config=config)
 
     def _get_uuid(self, *args: Any, **kwargs: Any):
-        return "gps"
+        return self.cls_uuid
 
     def _get_sensor_type(self, *args: Any, **kwargs: Any):
         return SensorTypes.POSITION
@@ -461,7 +465,7 @@ class ProximitySensor(Sensor):
         sim: reference to the simulator for calculating task observations.
         config: config for the sensor.
     """
-
+    cls_uuid: str = "proximity"
     def __init__(self, sim, config, *args: Any, **kwargs: Any):
         self._sim = sim
         self._max_detection_radius = getattr(
@@ -470,7 +474,7 @@ class ProximitySensor(Sensor):
         super().__init__(config=config)
 
     def _get_uuid(self, *args: Any, **kwargs: Any):
-        return "proximity"
+        return self.cls_uuid
 
     def _get_sensor_type(self, *args: Any, **kwargs: Any):
         return SensorTypes.TACTILE
