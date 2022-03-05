@@ -260,7 +260,7 @@ def observations_to_image(observation: Dict, projected_features: np.ndarray=None
         depth_map = np.stack([depth_map for _ in range(3)], axis=2)
         egocentric_view.append(depth_map)
 
-    if projected_features is not None:
+    if projected_features is not None and len(projected_features)>0:
         projected_features = cv2.resize(
             projected_features,
             depth_map.shape[:2],
@@ -270,7 +270,7 @@ def observations_to_image(observation: Dict, projected_features: np.ndarray=None
         projected_features  = cv2.applyColorMap(np.uint8(255 * projected_features), cv2.COLORMAP_JET)
         egocentric_view.append(projected_features)
 
-    if egocentric_projection is not None:
+    if egocentric_projection is not None and len(egocentric_projection)>0:
         egocentric_projection = cv2.resize(
             egocentric_projection,
             depth_map.shape[:2],
@@ -278,7 +278,7 @@ def observations_to_image(observation: Dict, projected_features: np.ndarray=None
         )
         egocentric_view.append(egocentric_projection)
 
-    if global_map is not None:
+    if global_map is not None and len(global_map)>0:
         global_map = cv2.resize(
             global_map,
             depth_map.shape[:2],

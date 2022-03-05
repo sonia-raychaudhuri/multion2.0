@@ -637,6 +637,7 @@ class PPOTrainerNO(BaseRLTrainerNonOracle):
         if len(self.config.VIDEO_OPTION) > 0:
             os.makedirs(self.config.VIDEO_DIR, exist_ok=True)
 
+        all_actions = {}
         pbar = tqdm.tqdm(total=self.config.TEST_EPISODE_COUNT)
         self.actor_critic.eval()
         while (
@@ -687,6 +688,9 @@ class PPOTrainerNO(BaseRLTrainerNonOracle):
             envs_to_pause = []
             n_envs = self.envs.num_envs
             for i in range(n_envs):
+                if current_episodes[i].episode_id not in all_actions:
+                    all_actions[current_episodes[i].episode_id] = []
+                all_actions[current_episodes[i].episode_id].append(actions[i].item())
                 if (
                     next_episodes[i].scene_id,
                     next_episodes[i].episode_id,
@@ -750,7 +754,7 @@ class PPOTrainerNO(BaseRLTrainerNonOracle):
                     #global_map1 = rotate_tensor(test_global_map_visualization[i][grid_x - math.floor(51/2):grid_x + math.ceil(51/2),grid_y - math.floor(51/2):grid_y + math.ceil(51/2),:].permute(2, 1, 0).unsqueeze(0), torch.tensor(-(observations[i]["compass"])).unsqueeze(0)).squeeze(0).permute(1, 2, 0).numpy()
                     egocentric_map = torch.sum(test_global_map[i, grid_x - math.floor(51/2):grid_x+math.ceil(51/2), grid_y - math.floor(51/2):grid_y + math.ceil(51/2),:], dim=2)
 
-                    frame = observations_to_image(observations[i], egocentric_map.data.cpu().numpy(), projection1.data.numpy(), global_map1, infos[i], actions[i].cpu().numpy())
+                    frame = observations_to_image(observations[i], egocentric_map.data.cpu().numpy(), projection1.data.numpy(), None, infos[i], actions[i].cpu().numpy())
                     rgb_frames[i].append(frame)
 
             (
@@ -821,6 +825,8 @@ class PPOTrainerNO(BaseRLTrainerNonOracle):
                 json.dump(raw_metrics_episodes, fp)
             with open(config.TENSORBOARD_DIR_EVAL +'/metrics/' + checkpoint_path.split('/')[-1] + '_overall.json', 'w') as fp:
                 json.dump(aggregated_stats, fp)
+            with open(config.TENSORBOARD_DIR_EVAL +'/metrics/' + checkpoint_path.split('/')[-1] + '_actions.json', 'w') as fp:
+                json.dump({"actions":all_actions}, fp)
 
         self.envs.close()
 

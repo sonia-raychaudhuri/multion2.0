@@ -34,6 +34,12 @@ from habitat.utils.geometry_utils import (
     quaternion_rotate_vector,
 )
 from habitat.utils.visualizations import fog_of_war, maps
+try:
+    from habitat.sims.habitat_simulator.habitat_simulator import HabitatSim
+    from habitat_sim import RigidState
+    from habitat_sim.physics import VelocityControl
+except ImportError:
+    pass
 
 cv2 = try_cv2_import()
 
@@ -972,72 +978,56 @@ class Collisions(Measure):
 
 @registry.register_measure
 class TopDownMap(Measure):
-    r"""Top Down Map measure
-    """
+    r"""Top Down Map measure"""
 
     def __init__(
-        self, *args: Any, sim: Simulator, config: Config, **kwargs: Any
+        self, sim: "HabitatSim", config: Config, *args: Any, **kwargs: Any
     ):
         self._sim = sim
         self._config = config
         self._grid_delta = config.MAP_PADDING
-        self._step_count = None
-        self._map_resolution = (config.MAP_RESOLUTION, config.MAP_RESOLUTION)
-        self._num_samples = config.NUM_TOPDOWN_MAP_SAMPLE_POINTS
-        self._ind_x_min = None
-        self._ind_x_max = None
-        self._ind_y_min = None
-        self._ind_y_max = None
-        self._previous_xy_location = None
-        self._coordinate_min = maps.COORDINATE_MIN
-        self._coordinate_max = maps.COORDINATE_MAX
-        self._top_down_map = None
-        self._shortest_path_points = None
-        self._cell_scale = (
-            self._coordinate_max - self._coordinate_min
-        ) / self._map_resolution[0]
-        self.line_thickness = int(
-            np.round(self._map_resolution[0] * 2 / MAP_THICKNESS_SCALAR)
-        )
-        self.point_padding = 2 * int(
-            np.ceil(self._map_resolution[0] / MAP_THICKNESS_SCALAR)
-        )
+        self._step_count: Optional[int] = None
+        self._map_resolution = config.MAP_RESOLUTION
+        self._ind_x_min: Optional[int] = None
+        self._ind_x_max: Optional[int] = None
+        self._ind_y_min: Optional[int] = None
+        self._ind_y_max: Optional[int] = None
+        self._previous_xy_location: Optional[Tuple[int, int]] = None
+        self._top_down_map: Optional[np.ndarray] = None
+        self._shortest_path_points: Optional[List[Tuple[int, int]]] = None
+        """ self.line_thickness = int(
+            np.round(self._map_resolution * 2 / MAP_THICKNESS_SCALAR)
+        ) """
+        self.line_thickness = 8
+        """ self.point_padding = 2 * int(
+            np.ceil(self._map_resolution / MAP_THICKNESS_SCALAR)
+        ) """
+        self.point_padding = 25
         super().__init__()
 
-    def _get_uuid(self, *args: Any, **kwargs: Any):
+    def _get_uuid(self, *args: Any, **kwargs: Any) -> str:
         return "top_down_map"
 
-    def _check_valid_nav_point(self, point: List[float]):
-        self._sim.is_navigable(point)
-
     def get_original_map(self):
-        top_down_map = maps.get_topdown_map(
+        top_down_map = maps.get_topdown_map_from_sim(
             self._sim,
-            self._map_resolution,
-            self._num_samples,
-            self._config.DRAW_BORDER,
+            map_resolution=self._map_resolution,
+            draw_border=self._config.DRAW_BORDER,
         )
-
-        range_x = np.where(np.any(top_down_map, axis=1))[0]
-        range_y = np.where(np.any(top_down_map, axis=0))[0]
-
-        self._ind_x_min = range_x[0]
-        self._ind_x_max = range_x[-1]
-        self._ind_y_min = range_y[0]
-        self._ind_y_max = range_y[-1]
 
         if self._config.FOG_OF_WAR.DRAW:
             self._fog_of_war_mask = np.zeros_like(top_down_map)
+        else:
+            self._fog_of_war_mask = None
 
         return top_down_map
 
     def _draw_point(self, position, point_type):
         t_x, t_y = maps.to_grid(
-            position[0],
             position[2],
-            self._coordinate_min,
-            self._coordinate_max,
-            self._map_resolution,
+            position[0],
+            self._top_down_map.shape[0:2],
+            sim=self._sim,
         )
         self._top_down_map[
             t_x - self.point_padding : t_x + self.point_padding + 1,
@@ -1047,26 +1037,30 @@ class TopDownMap(Measure):
     def _draw_goals_view_points(self, episode):
         if self._config.DRAW_VIEW_POINTS:
             for goal in episode.goals:
-                try:
-                    if goal.view_points is not None:
-                        for view_point in goal.view_points:
-                            self._draw_point(
-                                view_point.agent_state.position,
-                                maps.MAP_VIEW_POINT_INDICATOR,
-                            )
-                except AttributeError:
-                    pass
+                if self._is_on_same_floor(goal.position[1]):
+                    try:
+                        if goal.view_points is not None:
+                            for view_point in goal.view_points:
+                                self._draw_point(
+                                    view_point.agent_state.position,
+                                    maps.MAP_VIEW_POINT_INDICATOR,
+                                )
+                    except AttributeError:
+                        pass
 
     def _draw_goals_positions(self, episode):
         if self._config.DRAW_GOAL_POSITIONS:
 
+            ind = 10
             for goal in episode.goals:
-                try:
-                    self._draw_point(
-                        goal.position, maps.MAP_TARGET_POINT_INDICATOR
-                    )
-                except AttributeError:
-                    pass
+                if self._is_on_same_floor(goal.position[1]):
+                    try:
+                        self._draw_point(
+                            goal.position, ind
+                        )
+                        ind+=1
+                    except AttributeError:
+                        pass
 
     def _draw_goals_aabb(self, episode):
         if self._config.DRAW_GOAL_AABBS:
@@ -1094,15 +1088,15 @@ class TopDownMap(Measure):
                             (x_len, -z_len),
                             (-x_len, -z_len),
                         ]
+                        if self._is_on_same_floor(center[1])
                     ]
 
                     map_corners = [
                         maps.to_grid(
-                            p[0],
                             p[2],
-                            self._coordinate_min,
-                            self._coordinate_max,
-                            self._map_resolution,
+                            p[0],
+                            self._top_down_map.shape[0:2],
+                            sim=self._sim,
                         )
                         for p in corners
                     ]
@@ -1117,21 +1111,19 @@ class TopDownMap(Measure):
                     pass
 
     def _draw_shortest_path(
-        self, episode: Episode, agent_position: AgentState
+        self, episode: NavigationEpisode, agent_position: AgentState
     ):
         if self._config.DRAW_SHORTEST_PATH:
-            self._shortest_path_points = self._sim.get_straight_shortest_path_points(
-                agent_position, episode.goals[0].position
+            _shortest_path_points = (
+                self._sim.get_straight_shortest_path_points(
+                    agent_position, episode.goals[0].position
+                )
             )
             self._shortest_path_points = [
                 maps.to_grid(
-                    p[0],
-                    p[2],
-                    self._coordinate_min,
-                    self._coordinate_max,
-                    self._map_resolution,
+                    p[2], p[0], self._top_down_map.shape[0:2], sim=self._sim
                 )
-                for p in self._shortest_path_points
+                for p in _shortest_path_points
             ]
             maps.draw_path(
                 self._top_down_map,
@@ -1140,17 +1132,23 @@ class TopDownMap(Measure):
                 self.line_thickness,
             )
 
-    def reset_metric(self, *args: Any, episode, **kwargs: Any):
+    def _is_on_same_floor(
+        self, height, ref_floor_height=None, ceiling_height=2.0
+    ):
+        if ref_floor_height is None:
+            ref_floor_height = self._sim.get_agent(0).state.position[1]
+        return ref_floor_height <= height < ref_floor_height + ceiling_height
+
+    def reset_metric(self, episode, *args: Any, **kwargs: Any):
         self._step_count = 0
         self._metric = None
         self._top_down_map = self.get_original_map()
         agent_position = self._sim.get_agent_state().position
         a_x, a_y = maps.to_grid(
-            agent_position[0],
             agent_position[2],
-            self._coordinate_min,
-            self._coordinate_max,
-            self._map_resolution,
+            agent_position[0],
+            self._top_down_map.shape[0:2],
+            sim=self._sim,
         )
         self._previous_xy_location = (a_y, a_x)
 
@@ -1161,22 +1159,12 @@ class TopDownMap(Measure):
         self._draw_goals_aabb(episode)
         self._draw_goals_positions(episode)
 
-        self._draw_shortest_path(episode, agent_position)
+        #self._draw_shortest_path(episode, agent_position)
 
         if self._config.DRAW_SOURCE:
             self._draw_point(
                 episode.start_position, maps.MAP_SOURCE_POINT_INDICATOR
             )
-
-    def _clip_map(self, _map):
-        return _map[
-            self._ind_x_min
-            - self._grid_delta : self._ind_x_max
-            + self._grid_delta,
-            self._ind_y_min
-            - self._grid_delta : self._ind_y_max
-            + self._grid_delta,
-        ]
 
     def update_metric(self, episode, action, *args: Any, **kwargs: Any):
         self._step_count += 1
@@ -1184,21 +1172,10 @@ class TopDownMap(Measure):
             self._sim.get_agent_state().position
         )
 
-        # Rather than return the whole map which may have large empty regions,
-        # only return the occupied part (plus some padding).
-        clipped_house_map = self._clip_map(house_map)
-
-        clipped_fog_of_war_map = None
-        if self._config.FOG_OF_WAR.DRAW:
-            clipped_fog_of_war_map = self._clip_map(self._fog_of_war_mask)
-
         self._metric = {
-            "map": clipped_house_map,
-            "fog_of_war_mask": clipped_fog_of_war_map,
-            "agent_map_coord": (
-                map_agent_x - (self._ind_x_min - self._grid_delta),
-                map_agent_y - (self._ind_y_min - self._grid_delta),
-            ),
+            "map": house_map,
+            "fog_of_war_mask": self._fog_of_war_mask,
+            "agent_map_coord": (map_agent_x, map_agent_y),
             "agent_angle": self.get_polar_angle(),
         }
 
@@ -1212,16 +1189,15 @@ class TopDownMap(Measure):
         )
 
         phi = cartesian_to_polar(-heading_vector[2], heading_vector[0])[1]
-        x_y_flip = -np.pi / 2
-        return np.array(phi) + x_y_flip
+        z_neg_z_flip = np.pi
+        return np.array(phi) + z_neg_z_flip
 
     def update_map(self, agent_position):
         a_x, a_y = maps.to_grid(
-            agent_position[0],
             agent_position[2],
-            self._coordinate_min,
-            self._coordinate_max,
-            self._map_resolution,
+            agent_position[0],
+            self._top_down_map.shape[0:2],
+            sim=self._sim,
         )
         # Don't draw over the source point
         if self._top_down_map[a_x, a_y] != maps.MAP_SOURCE_POINT_INDICATOR:
@@ -1229,9 +1205,7 @@ class TopDownMap(Measure):
                 self._step_count * 245 // self._config.MAX_EPISODE_STEPS, 245
             )
 
-            thickness = int(
-                np.round(self._map_resolution[0] * 2 / MAP_THICKNESS_SCALAR)
-            )
+            thickness = self.line_thickness
             cv2.line(
                 self._top_down_map,
                 self._previous_xy_location,
@@ -1254,8 +1228,9 @@ class TopDownMap(Measure):
                 self.get_polar_angle(),
                 fov=self._config.FOG_OF_WAR.FOV,
                 max_line_len=self._config.FOG_OF_WAR.VISIBILITY_DIST
-                * max(self._map_resolution)
-                / (self._coordinate_max - self._coordinate_min),
+                / maps.calculate_meters_per_pixel(
+                    self._map_resolution, sim=self._sim
+                ),
             )
 
 
@@ -2102,9 +2077,7 @@ class RawMetrics(Measure):
         self._agent_episode_distance = 0.0
         self._metric = None
         task.measurements.check_measure_dependencies(
-            self.uuid, [EpisodeLength.cls_uuid, MultiONSPL.cls_uuid, 
-                        DistanceToMultiGoal.cls_uuid, DistanceToCurrentObjectGoal.cls_uuid,
-                        MultiONSuccess.cls_uuid, Progress.cls_uuid]
+            self.uuid, [EpisodeLength.cls_uuid, MSPL.cls_uuid, PSPL.cls_uuid, DistanceToMultiGoal.cls_uuid, DistanceToCurrGoal.cls_uuid, SubSuccess.cls_uuid, Success.cls_uuid, PercentageSuccess.cls_uuid]
         )
         self.update_metric(*args, episode=episode, task=task, **kwargs)
         ##
@@ -2114,40 +2087,34 @@ class RawMetrics(Measure):
             np.array(position_b) - np.array(position_a), ord=2
         )
 
-    def update_metric(
-        self,
-        *args: Any,
-        episode,
-        task: EmbodiedTask,
-        **kwargs: Any,
-    ):
+    def update_metric(self, *args: Any, episode, task: EmbodiedTask, **kwargs: Any):
         current_position = self._sim.get_agent_state().position.tolist()
-        ep_success = task.measurements.measures[MultiONSuccess.cls_uuid].get_metric()
-        progress = task.measurements.measures[Progress.cls_uuid].get_metric()
-        distance_to_curr_subgoal = task.measurements.measures[DistanceToCurrentObjectGoal.cls_uuid].get_metric()
-        curr_goal_success = task.measurements.measures[CurrentGoalSuccess.cls_uuid].get_metric()
+        ep_success = task.measurements.measures[Success.cls_uuid].get_metric()
+        p_success = task.measurements.measures[PercentageSuccess.cls_uuid].get_metric()
+        distance_to_curr_subgoal = task.measurements.measures[DistanceToCurrGoal.cls_uuid].get_metric()
+        ep_sub_success = task.measurements.measures[SubSuccess.cls_uuid].get_metric()
 
         self._agent_episode_distance += self._euclidean_distance(
             current_position, self._previous_position
         )
         self._previous_position = current_position
-        if curr_goal_success:
+        if ep_sub_success:
             self._start_subgoal_agent_distance.append(self._agent_episode_distance)
 
         self._metric = {
             'success': ep_success,
-            'progress': progress,
+            'percentage_success': p_success,
             'geodesic_distances': self._start_subgoal_episode_distance,
             'agent_path_length': self._agent_episode_distance,
             'subgoals_found': task.current_goal_index,
-            'current_goal_success': curr_goal_success,
             'distance_to_curr_subgoal': distance_to_curr_subgoal,
             'agent_distances': self._start_subgoal_agent_distance,
             'distance_to_multi_goal': task.measurements.measures[DistanceToMultiGoal.cls_uuid].get_metric(),
-            'spl': task.measurements.measures[MultiONSPL.cls_uuid].get_metric(),
-            'ppl': task.measurements.measures[MultiONPPL.cls_uuid].get_metric(),
+            'MSPL': task.measurements.measures[MSPL.cls_uuid].get_metric(),
+            'PSPL': task.measurements.measures[PSPL.cls_uuid].get_metric(),
             'episode_lenth': task.measurements.measures[EpisodeLength.cls_uuid].get_metric()
         }
+
 
 
 
