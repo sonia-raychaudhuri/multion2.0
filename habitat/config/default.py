@@ -291,7 +291,43 @@ _C.TASK.RATIO.DISTANCE_TO = "POINT"
 
 _C.TASK.RAW_METRICS = CN()
 _C.TASK.RAW_METRICS.TYPE = "RawMetrics"
+# -----------------------------------------------------------------------------
+# # DISTANCE_TO_CURRENT_GOAL MEASUREMENT
+# -----------------------------------------------------------------------------
+_C.TASK.DISTANCE_TO_CURR_GOAL = CN()
+_C.TASK.DISTANCE_TO_CURR_GOAL.TYPE = "DistanceToCurrGoal"
+_C.TASK.DISTANCE_TO_CURR_GOAL.DISTANCE_TO = "POINT"
+# -----------------------------------------------------------------------------
+# # SUB_SUCCESS MEASUREMENT
+# -----------------------------------------------------------------------------
+_C.TASK.SUB_SUCCESS = CN()
+_C.TASK.SUB_SUCCESS.TYPE = "SubSuccess"
+_C.TASK.SUB_SUCCESS.SUCCESS_DISTANCE = 1.0
+# -----------------------------------------------------------------------------
+# # PERCENTAGE_SUCCESS MEASUREMENT
+# -----------------------------------------------------------------------------
+_C.TASK.PERCENTAGE_SUCCESS = CN()
+_C.TASK.PERCENTAGE_SUCCESS.TYPE = "PercentageSuccess"
+_C.TASK.PERCENTAGE_SUCCESS.SUCCESS_DISTANCE = 1.0
+# -----------------------------------------------------------------------------
+# SUCCESS MEASUREMENT
+# -----------------------------------------------------------------------------
+_C.TASK.SUCCESS = CN()
+_C.TASK.SUCCESS.TYPE = "Success"
+_C.TASK.SUCCESS.SUCCESS_DISTANCE = 0.2
 
+# -----------------------------------------------------------------------------
+# MSPL MEASUREMENT
+# -----------------------------------------------------------------------------
+_C.TASK.MSPL = CN()
+_C.TASK.MSPL.TYPE = "MSPL"
+# -----------------------------------------------------------------------------
+# PSPL MEASUREMENT
+# -----------------------------------------------------------------------------
+_C.TASK.PSPL = CN()
+_C.TASK.PSPL.TYPE = "PSPL"
+
+# -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 # SIMULATOR
 # -----------------------------------------------------------------------------

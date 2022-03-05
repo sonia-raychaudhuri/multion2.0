@@ -269,11 +269,11 @@ class Env:
             self._sim.set_translation(np.array(self.current_episode.goals[i].position), ind)
             
             # random rotation only on the Y axis
-            y_rotation = mn.Quaternion.rotation(
+            """ y_rotation = mn.Quaternion.rotation(
                 mn.Rad(random.random() * 2 * math.pi), mn.Vector3(0, 1.0, 0)
             )
             self._sim.set_rotation(y_rotation, ind)
-            self._sim.set_object_motion_type(habitat_sim.physics.MotionType.STATIC, ind)
+            self._sim.set_object_motion_type(habitat_sim.physics.MotionType.STATIC, ind) """
 
         for i in range(len(self.current_episode.distractors)):
             current_distractor = self.current_episode.distractors[i].object_category
@@ -282,11 +282,11 @@ class Env:
             self._sim.set_translation(np.array(self.current_episode.distractors[i].position), ind)
             
             # random rotation only on the Y axis
-            y_rotation = mn.Quaternion.rotation(
+            """ y_rotation = mn.Quaternion.rotation(
                 mn.Rad(random.random() * 2 * math.pi), mn.Vector3(0, 1.0, 0)
             )
             self._sim.set_rotation(y_rotation, ind)
-            self._sim.set_object_motion_type(habitat_sim.physics.MotionType.STATIC, ind)
+            self._sim.set_object_motion_type(habitat_sim.physics.MotionType.STATIC, ind) """
 
         observations = self.task.reset(episode=self.current_episode)
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
@@ -386,7 +386,7 @@ class Env:
         ##Terminates episode if wrong found is called
         if self.task.is_found_called == True and \
             self.task.measurements.measures[
-            "current_goal_success"
+            "sub_success" #"current_goal_success"
         ].get_metric() == 0:
             self.task._is_episode_active = False
         

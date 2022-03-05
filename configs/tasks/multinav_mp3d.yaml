@@ -30,7 +30,7 @@ TASK:
   TYPE: MultiObjectNav-v1
   POSSIBLE_ACTIONS: ["FOUND", "MOVE_FORWARD", "TURN_LEFT", "TURN_RIGHT"]
 
-  SUCCESS_DISTANCE: 1.5
+  # SUCCESS_DISTANCE: 1.0
 
   SENSORS: ['MULTI_OBJECT_GOAL_SENSOR', 'COMPASS_SENSOR', 'GPS_SENSOR']
 
@@ -38,24 +38,45 @@ TASK:
 
   MEASUREMENTS: [
     'DISTANCE_TO_GOAL',
-    'DISTANCE_TO_CURRENT_OBJECT_GOAL', 
-    'DISTANCE_TO_MULTI_GOAL',
-    'CURRENT_GOAL_SUCCESS', 
-    'PROGRESS', 
-    'MULTION_SUCCESS', 
-    'MULTION_SPL', 
-    'MULTION_PPL',
+    # 'DISTANCE_TO_CURRENT_OBJECT_GOAL', 
+    # 'DISTANCE_TO_MULTI_GOAL',
+    # 'CURRENT_GOAL_SUCCESS', 
+    # 'PROGRESS', 
+    # 'MULTION_SUCCESS', 
+    # 'MULTION_SPL', 
+    # 'MULTION_PPL',
     'EPISODE_LENGTH',
-    'RATIO',
-    'RAW_METRICS']
+    'DISTANCE_TO_CURR_GOAL', 
+    'DISTANCE_TO_MULTI_GOAL', 
+    'SUB_SUCCESS', 
+    'SUCCESS', 
+    'MSPL', 
+    'PERCENTAGE_SUCCESS', 
+    'PSPL',
+    #'RATIO', 'RAW_METRICS'
+    ]
 
+  # SUCCESS:
+  #   SUCCESS_DISTANCE: 1.0
+  # CURRENT_GOAL_SUCCESS:
+  #   SUCCESS_DISTANCE: 1.0
+  # DISTANCE_TO_GOAL:
+  #   DISTANCE_TO: POINT
+
+  SUCCESS_DISTANCE: 1.5
+
+  SUCCESS:
+    SUCCESS_DISTANCE: 1.5
+  SUB_SUCCESS:
+    SUCCESS_DISTANCE: 1.5
+  PERCENTAGE_SUCCESS:
+    SUCCESS_DISTANCE: 1.5
   DISTANCE_TO_GOAL:
     DISTANCE_TO: POINT
-  CURRENT_GOAL_SUCCESS:
-    SUCCESS_DISTANCE: 1.5
 
 DATASET:
   TYPE: MultiObjectNav-v1
   SPLIT: train
-  DATA_PATH: "data/datasets/multinav/3_ON/{split}/{split}.json.gz"
-  SCENES_DIR: "data/scene_datasets/"
+  DATA_PATH: "data/multion1.0/datasets/3_ON/full_validation_set/{split}.json.gz"
+  #"data/multion1.0/datasets/3_ON/full_{split}_set/{split}.json.gz" #"data/multion1.0/datasets/3_ON/{split}/{split}.json.gz"
+  SCENES_DIR: "data/multion1.0/scene_datasets/"
