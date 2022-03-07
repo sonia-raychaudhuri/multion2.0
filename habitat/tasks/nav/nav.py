@@ -581,9 +581,52 @@ class SubSuccess(Measure):
             self._metric = 1
             task.current_goal_index+=1
             task.foundDistance = distance_to_subgoal
+            task.measurements.measures[
+                DistanceToCurrGoal.cls_uuid
+            ].update_metric(*args, episode=episode, task=task, **kwargs)
         else:
             self._metric = 0
     
+@registry.register_measure
+class OracleSubSuccess(Measure):
+    r"""Whether or not the agent reached it's
+    current goal even when it didn't call Found. 
+    This measure depends on DistanceToGoal measure.
+    """
+
+    cls_uuid: str = "oracle_sub_success"
+
+    def __init__(
+        self, *args: Any, sim: Simulator, config: Config, **kwargs: Any
+    ):
+        self._sim = sim
+        self._config = config
+
+        super().__init__()
+
+    def _get_uuid(self, *args: Any, **kwargs: Any):
+        return self.cls_uuid
+
+    def reset_metric(self, *args: Any, episode, task, **kwargs: Any): ##Called only when episode begins
+        task.measurements.check_measure_dependencies(
+            self.uuid, [DistanceToCurrGoal.cls_uuid]
+        )
+        task.current_goal_index=0  
+        self.update_metric(*args, episode=episode, task=task, **kwargs)
+
+    def update_metric(
+        self, *args: Any, episode, task: EmbodiedTask, **kwargs: Any
+    ):
+        distance_to_subgoal = task.measurements.measures[
+            DistanceToCurrGoal.cls_uuid
+        ].get_metric()
+
+        if (distance_to_subgoal <= self._config.SUCCESS_DISTANCE):
+            self._metric = 1
+            task.current_goal_index+=1
+            task.foundDistance = distance_to_subgoal
+        else:
+            self._metric = 0
 
 @registry.register_measure
 class PercentageSuccess(Measure):

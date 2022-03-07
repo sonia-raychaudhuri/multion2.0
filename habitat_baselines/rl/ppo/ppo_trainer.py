@@ -504,14 +504,22 @@ class PPOTrainerNO(BaseRLTrainerNonOracle):
                 }
 
                 if len(metrics) > 0:
-                    writer.add_scalar("metrics/distance_to_current_object_goal", metrics["distance_to_current_object_goal"], count_steps)
+                    """ writer.add_scalar("metrics/distance_to_current_object_goal", metrics["distance_to_current_object_goal"], count_steps)
                     writer.add_scalar("metrics/multiON_success", metrics["multiON_success"], count_steps)
                     writer.add_scalar("metrics/current_goal_success", metrics["current_goal_success"], count_steps)
                     writer.add_scalar("metrics/episode_length", metrics["episode_length"], count_steps)
                     writer.add_scalar("metrics/distance_to_multi_goal", metrics["distance_to_multi_goal"], count_steps)
                     writer.add_scalar("metrics/progress", metrics["progress"], count_steps)
                     writer.add_scalar("metrics/multiON_spl", metrics["multiON_spl"], count_steps)
-                    writer.add_scalar("metrics/multiON_ppl", metrics["multiON_ppl"], count_steps)
+                    writer.add_scalar("metrics/multiON_ppl", metrics["multiON_ppl"], count_steps) """
+                    writer.add_scalar("metrics/distance_to_currgoal", metrics["distance_to_currgoal"], count_steps)
+                    writer.add_scalar("metrics/distance_to_multi_goal", metrics["distance_to_multi_goal"], count_steps)
+                    writer.add_scalar("metrics/episode_length", metrics["episode_length"], count_steps)
+                    writer.add_scalar("metrics/mspl", metrics["mspl"], count_steps)
+                    writer.add_scalar("metrics/pspl", metrics["pspl"], count_steps)
+                    writer.add_scalar("metrics/percentage_success", metrics["percentage_success"], count_steps)
+                    writer.add_scalar("metrics/success", metrics["success"], count_steps)
+                    writer.add_scalar("metrics/sub_success", metrics["sub_success"], count_steps)
 
                 writer.add_scalar("train/losses_value", value_loss, count_steps)
                 writer.add_scalar("train/losses_policy", action_loss, count_steps)
@@ -1340,14 +1348,22 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 }
 
                 if len(metrics) > 0:
-                    writer.add_scalar("metrics/distance_to_current_object_goal", metrics["distance_to_current_object_goal"], count_steps)
+                    """ writer.add_scalar("metrics/distance_to_current_object_goal", metrics["distance_to_current_object_goal"], count_steps)
                     writer.add_scalar("metrics/multiON_success", metrics["multiON_success"], count_steps)
                     writer.add_scalar("metrics/current_goal_success", metrics["current_goal_success"], count_steps)
                     writer.add_scalar("metrics/episode_length", metrics["episode_length"], count_steps)
                     writer.add_scalar("metrics/distance_to_multi_goal", metrics["distance_to_multi_goal"], count_steps)
                     writer.add_scalar("metrics/progress", metrics["progress"], count_steps)
                     writer.add_scalar("metrics/multiON_spl", metrics["multiON_spl"], count_steps)
-                    writer.add_scalar("metrics/multiON_ppl", metrics["multiON_ppl"], count_steps)
+                    writer.add_scalar("metrics/multiON_ppl", metrics["multiON_ppl"], count_steps) """
+                    writer.add_scalar("metrics/distance_to_currgoal", metrics["distance_to_currgoal"], count_steps)
+                    writer.add_scalar("metrics/distance_to_multi_goal", metrics["distance_to_multi_goal"], count_steps)
+                    writer.add_scalar("metrics/episode_length", metrics["episode_length"], count_steps)
+                    writer.add_scalar("metrics/mspl", metrics["mspl"], count_steps)
+                    writer.add_scalar("metrics/pspl", metrics["pspl"], count_steps)
+                    writer.add_scalar("metrics/percentage_success", metrics["percentage_success"], count_steps)
+                    writer.add_scalar("metrics/success", metrics["success"], count_steps)
+                    writer.add_scalar("metrics/sub_success", metrics["sub_success"], count_steps)
 
                 writer.add_scalar("train/losses_value", value_loss, count_steps)
                 writer.add_scalar("train/losses_policy", action_loss, count_steps)
@@ -1597,7 +1613,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
             step_id,
         )
 
-        metrics = {k: v for k, v in aggregated_stats.items() if k != "reward"}
+        """ metrics = {k: v for k, v in aggregated_stats.items() if k != "reward"}
         writer.add_scalar("eval/distance_to_current_object_goal", metrics["distance_to_current_object_goal"], step_id)
         writer.add_scalar("eval/multiON_success", metrics["multiON_success"], step_id)
         writer.add_scalar("eval/current_goal_success", metrics["current_goal_success"], step_id)
@@ -1605,7 +1621,16 @@ class PPOTrainerO(BaseRLTrainerOracle):
         writer.add_scalar("eval/distance_to_multi_goal", metrics["distance_to_multi_goal"], step_id)
         writer.add_scalar("eval/progress", metrics["progress"], step_id)
         writer.add_scalar("eval/multiON_spl", metrics["multiON_spl"], step_id)
-        writer.add_scalar("eval/multiON_ppl", metrics["multiON_ppl"], step_id)
+        writer.add_scalar("eval/multiON_ppl", metrics["multiON_ppl"], step_id) """
+        metrics = {k: v for k, v in aggregated_stats.items() if k != "reward"}
+        writer.add_scalar("eval/distance_to_currgoal", metrics["distance_to_currgoal"], step_id)
+        writer.add_scalar("eval/distance_to_multi_goal", metrics["distance_to_multi_goal"], step_id)
+        writer.add_scalar("eval/episode_length", metrics["episode_length"], step_id)
+        writer.add_scalar("eval/mspl", metrics["mspl"], step_id)
+        writer.add_scalar("eval/pspl", metrics["pspl"], step_id)
+        writer.add_scalar("eval/percentage_success", metrics["percentage_success"], step_id)
+        writer.add_scalar("eval/success", metrics["success"], step_id)
+        writer.add_scalar("eval/sub_success", metrics["sub_success"], step_id)
 
         
 
@@ -1790,7 +1815,7 @@ class PPOTrainer(BaseRLTrainer):
             # Multiply by the number of simulators to make sure they also get unique seeds
             self.config.TASK_CONFIG.SEED += (
                 torch.distributed.get_world_size()
-                * self.config.NUM_ENVIRONMENTS
+                * self.config.NUM_PROCESSES
             )
             self.config.freeze()
 
@@ -1921,7 +1946,7 @@ class PPOTrainer(BaseRLTrainer):
         """
         return torch.load(checkpoint_path, *args, **kwargs)
 
-    METRICS_BLACKLIST = {"top_down_map", "collisions.is_collision"}
+    METRICS_BLACKLIST = {"top_down_map", "collisions.is_collision", "raw_metrics"}
 
     @classmethod
     def _extract_scalars_from_info(
@@ -2232,14 +2257,22 @@ class PPOTrainer(BaseRLTrainer):
             writer.add_scalars("metrics", metrics, self.num_steps_done)
          
         if len(metrics) > 0:
-            writer.add_scalar("metrics/distance_to_current_object_goal", metrics["distance_to_current_object_goal"], self.num_steps_done)
+            """ writer.add_scalar("metrics/distance_to_current_object_goal", metrics["distance_to_current_object_goal"], self.num_steps_done)
             writer.add_scalar("metrics/multiON_success", metrics["multiON_success"], self.num_steps_done)
             writer.add_scalar("metrics/current_goal_success", metrics["current_goal_success"], self.num_steps_done)
             writer.add_scalar("metrics/episode_length", metrics["episode_length"], self.num_steps_done)
             writer.add_scalar("metrics/distance_to_multi_goal", metrics["distance_to_multi_goal"], self.num_steps_done)
             writer.add_scalar("metrics/progress", metrics["progress"], self.num_steps_done)
             writer.add_scalar("metrics/multiON_spl", metrics["multiON_spl"], self.num_steps_done)
-            writer.add_scalar("metrics/multiON_ppl", metrics["multiON_ppl"], self.num_steps_done)
+            writer.add_scalar("metrics/multiON_ppl", metrics["multiON_ppl"], self.num_steps_done) """
+            writer.add_scalar("metrics/distance_to_currgoal", metrics["distance_to_currgoal"], self.num_steps_done)
+            writer.add_scalar("metrics/distance_to_multi_goal", metrics["distance_to_multi_goal"], self.num_steps_done)
+            writer.add_scalar("metrics/episode_length", metrics["episode_length"], self.num_steps_done)
+            writer.add_scalar("metrics/mspl", metrics["mspl"], self.num_steps_done)
+            writer.add_scalar("metrics/pspl", metrics["pspl"], self.num_steps_done)
+            writer.add_scalar("metrics/percentage_success", metrics["percentage_success"], self.num_steps_done)
+            writer.add_scalar("metrics/success", metrics["success"], self.num_steps_done)
+            writer.add_scalar("metrics/sub_success", metrics["sub_success"], self.num_steps_done)
 
         writer.add_scalar("train/losses_value", value_loss, self.num_steps_done)
         writer.add_scalar("train/losses_policy", action_loss, self.num_steps_done)
@@ -2503,19 +2536,19 @@ class PPOTrainer(BaseRLTrainer):
         )
 
         test_recurrent_hidden_states = torch.zeros(
-            self.config.NUM_ENVIRONMENTS,
+            self.config.NUM_PROCESSES,
             self.actor_critic.net.num_recurrent_layers,
             ppo_cfg.hidden_size,
             device=self.device,
         )
         prev_actions = torch.zeros(
-            self.config.NUM_ENVIRONMENTS,
+            self.config.NUM_PROCESSES,
             1,
             device=self.device,
             dtype=torch.long,
         )
         not_done_masks = torch.zeros(
-            self.config.NUM_ENVIRONMENTS,
+            self.config.NUM_PROCESSES,
             1,
             device=self.device,
             dtype=torch.bool,
@@ -2525,7 +2558,7 @@ class PPOTrainer(BaseRLTrainer):
         ] = {}  # dict of dicts that stores stats per episode
 
         rgb_frames = [
-            [] for _ in range(self.config.NUM_ENVIRONMENTS)
+            [] for _ in range(self.config.NUM_PROCESSES)
         ]  # type: List[List[np.ndarray]]
         if len(self.config.VIDEO_OPTION) > 0:
             os.makedirs(self.config.VIDEO_DIR, exist_ok=True)
@@ -2640,7 +2673,7 @@ class PPOTrainer(BaseRLTrainer):
                 elif len(self.config.VIDEO_OPTION) > 0:
                     # TODO move normalization / channel changing out of the policy and undo it here
                     frame = observations_to_image(
-                        {k: v[i] for k, v in batch.items()}, infos[i]
+                        {k: v[i] for k, v in batch.items()}, info=infos[i]
                     )
                     rgb_frames[i].append(frame)
 
