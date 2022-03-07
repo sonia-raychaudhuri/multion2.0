@@ -581,7 +581,7 @@ class SubSuccess(Measure):
             self._metric = 1
             task.current_goal_index+=1
             task.foundDistance = distance_to_subgoal
-            if task.current_goal_index <= len(episode.goals)-1:
+            if task.current_goal_index < len(episode.goals):
                 task.measurements.measures[
                     DistanceToCurrGoal.cls_uuid
                 ].update_metric(*args, episode=episode, task=task, **kwargs)
