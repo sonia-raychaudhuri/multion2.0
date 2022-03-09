@@ -227,29 +227,29 @@ class MultiObjectNavigationTask(NavigationTask):
             self._sim.set_translation(np.array(episode.goals[i].position), ind)
             
             # random rotation only on the Y axis
-            y_rotation = mn.Quaternion.rotation(
-                mn.Rad(random.random() * 2 * math.pi), mn.Vector3(0, 1.0, 0)
-            )
-            self._sim.set_rotation(y_rotation, ind)
+            # y_rotation = mn.Quaternion.rotation(
+            #     mn.Rad(random.random() * 2 * math.pi), mn.Vector3(0, 1.0, 0)
+            # )
+            # self._sim.set_rotation(y_rotation, ind)
             
-            self._sim.set_object_motion_type(habitat_sim.physics.MotionType.STATIC, ind)
+            # self._sim.set_object_motion_type(habitat_sim.physics.MotionType.STATIC, ind)
             
-        
-        for i in range(len(episode.distractors)):
-            current_distractor = episode.distractors[i].object_category
-            dataset_index = obj_templates_mgr.load_configs(
-                str(os.path.join(obj_path, current_distractor))
-            )[0]
-            
-            ind = self._sim.add_object(dataset_index)
-            self._sim.set_translation(np.array(episode.distractors[i].position), ind)
-            
-            # random rotation only on the Y axis
-            y_rotation = mn.Quaternion.rotation(
-                mn.Rad(random.random() * 2 * math.pi), mn.Vector3(0, 1.0, 0)
-            )
-            self._sim.set_rotation(y_rotation, ind)
-            self._sim.set_object_motion_type(habitat_sim.physics.MotionType.STATIC, ind)
+        if self._config.INCLUDE_DISTRACTORS:
+            for i in range(len(episode.distractors)):
+                current_distractor = episode.distractors[i].object_category
+                dataset_index = obj_templates_mgr.load_configs(
+                    str(os.path.join(obj_path, current_distractor))
+                )[0]
+                
+                ind = self._sim.add_object(dataset_index)
+                self._sim.set_translation(np.array(episode.distractors[i].position), ind)
+                
+                # random rotation only on the Y axis
+                y_rotation = mn.Quaternion.rotation(
+                    mn.Rad(random.random() * 2 * math.pi), mn.Vector3(0, 1.0, 0)
+                )
+                self._sim.set_rotation(y_rotation, ind)
+                self._sim.set_object_motion_type(habitat_sim.physics.MotionType.STATIC, ind)
 
         # Reinitialize current goal index
         self.current_goal_index = 0
