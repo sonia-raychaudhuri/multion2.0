@@ -74,6 +74,12 @@ class NavRLEnv(habitat.RLEnv):
 
         if self._episode_subsuccess():
             self._previous_measure = self._env.get_metrics()[self._reward_measure_name]
+        
+        if self._rl_config.LIMIT_FWD_REWARD:
+            if reward < -0.3:
+                reward = -0.3
+            if reward > 0.3:
+                reward = 0.3
 
         if self._episode_success():
             reward += self._rl_config.SUCCESS_REWARD

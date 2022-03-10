@@ -1632,6 +1632,14 @@ class PPOTrainerO(BaseRLTrainerOracle):
         writer.add_scalar("eval/success", metrics["success"], step_id)
         writer.add_scalar("eval/sub_success", metrics["sub_success"], step_id)
 
+        writer.add_scalar("eval/distance_to_currgoal", metrics["distance_to_currgoal"], step_id)
+        writer.add_scalar("eval/distance_to_multi_goal", metrics["distance_to_multi_goal"], step_id)
+        writer.add_scalar("eval/episode_length", metrics["episode_length"], step_id)
+        writer.add_scalar("eval/mspl", metrics["mspl"], step_id)
+        writer.add_scalar("eval/pspl", metrics["pspl"], step_id)
+        writer.add_scalar("eval/percentage_success", metrics["percentage_success"], step_id)
+        writer.add_scalar("eval/success", metrics["success"], step_id)
+        writer.add_scalar("eval/sub_success", metrics["sub_success"], step_id)
         
 
         ##Dump metrics JSON

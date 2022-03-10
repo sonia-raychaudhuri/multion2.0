@@ -70,6 +70,7 @@ _C.RL.SLACK_REWARD = -0.01
 _C.RL.OBJECT_CATEGORY_EMBEDDING_SIZE = 32
 _C.RL.PREVIOUS_ACTION_EMBEDDING_SIZE = 32
 _C.RL.PREVIOUS_ACTION = True
+_C.RL.LIMIT_FWD_REWARD = False
 # -----------------------------------------------------------------------------
 # PROXIMAL POLICY OPTIMIZATION (PPO)
 # -----------------------------------------------------------------------------
