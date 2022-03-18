@@ -649,7 +649,7 @@ class PercentageSuccess(Measure):
 
     def reset_metric(self, *args: Any, episode, task, **kwargs: Any): ##Called only when episode begins
         task.measurements.check_measure_dependencies(
-            self.uuid, [DistanceToCurrGoal.cls_uuid]
+            self.uuid, [SubSuccess.cls_uuid]
         )
         self._metric=0
         self.update_metric(*args, episode=episode, task=task, **kwargs)
@@ -657,15 +657,12 @@ class PercentageSuccess(Measure):
     def update_metric(
         self, *args: Any, episode, task: EmbodiedTask, **kwargs: Any
     ):
-        distance_to_subgoal = task.measurements.measures[
-            DistanceToCurrGoal.cls_uuid
+        
+        sub_success = task.measurements.measures[
+            SubSuccess.cls_uuid
         ].get_metric()
 
-        if (
-            hasattr(task, "is_found_called")
-            and task.is_found_called
-            and distance_to_subgoal < self._config.SUCCESS_DISTANCE
-        ):
+        if sub_success == 1:
             self._metric += 1/len(episode.goals)
 
 @registry.register_measure
