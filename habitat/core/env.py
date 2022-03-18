@@ -353,6 +353,9 @@ class Env:
         assert (
             self._episode_over is False
         ), "Episode over, call reset before calling step"
+
+        if self._config.RL.ORACLE_FOUND and self._episode_oracle_found():
+            action = 0  # Oracle Found
         
         self.task.is_found_called = bool(action == 0)
         
@@ -399,6 +402,9 @@ class Env:
         self._update_step_stats()
 
         return observations
+
+    def _episode_oracle_found(self):
+        return self._env.get_metrics()[self._config.RL.ORACLE_SUBSUCCESS_MEASURE]
     
     @staticmethod
     @numba.njit

@@ -55,22 +55,22 @@ _C.EVAL = CN()
 # The split to evaluate on
 _C.EVAL.SPLIT = "val"
 _C.EVAL.USE_CKPT_CONFIG = True
+_C.EVAL.EVAL_NONLEARNING = False
 # -----------------------------------------------------------------------------
 # REINFORCEMENT LEARNING (RL) ENVIRONMENT CONFIG
 # -----------------------------------------------------------------------------
 _C.RL = CN()
-""" _C.RL.REWARD_MEASURE = "distance_to_current_object_goal"
-_C.RL.SUCCESS_MEASURE = "multiON_success"
-_C.RL.SUBSUCCESS_MEASURE = "current_goal_success" """
 _C.RL.REWARD_MEASURE = "distance_to_currgoal"
 _C.RL.SUCCESS_MEASURE = "success"
 _C.RL.SUBSUCCESS_MEASURE = "sub_success"
+_C.RL.ORACLE_SUBSUCCESS_MEASURE = "oracle_sub_success"
 _C.RL.SUCCESS_REWARD = 10.0
 _C.RL.SLACK_REWARD = -0.01
 _C.RL.OBJECT_CATEGORY_EMBEDDING_SIZE = 32
 _C.RL.PREVIOUS_ACTION_EMBEDDING_SIZE = 32
 _C.RL.PREVIOUS_ACTION = True
 _C.RL.LIMIT_FWD_REWARD = False
+_C.RL.ORACLE_FOUND = False
 # -----------------------------------------------------------------------------
 # PROXIMAL POLICY OPTIMIZATION (PPO)
 # -----------------------------------------------------------------------------

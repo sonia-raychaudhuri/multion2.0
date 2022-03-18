@@ -240,44 +240,12 @@ _C.TASK.OBJECTS_TYPE = "CYL" #"REAL" or "CYL"
 _C.TASK.INCLUDE_DISTRACTORS = True
 _C.TASK.ACTIONS.FOUND = CN()
 _C.TASK.ACTIONS.FOUND.TYPE = "FoundObjectAction"
-# # DISTANCE_TO_CURRENT_GOAL MEASUREMENT
-# -----------------------------------------------------------------------------
-_C.TASK.DISTANCE_TO_CURRENT_OBJECT_GOAL = CN()
-_C.TASK.DISTANCE_TO_CURRENT_OBJECT_GOAL.TYPE = "DistanceToCurrentObjectGoal"
-_C.TASK.DISTANCE_TO_CURRENT_OBJECT_GOAL.DISTANCE_TO = "POINT"
 # -----------------------------------------------------------------------------
 # # DISTANCE_TO_MULTI_GOAL MEASUREMENT
 # -----------------------------------------------------------------------------
 _C.TASK.DISTANCE_TO_MULTI_GOAL = CN()
 _C.TASK.DISTANCE_TO_MULTI_GOAL.TYPE = "DistanceToMultiGoal"
 _C.TASK.DISTANCE_TO_MULTI_GOAL.DISTANCE_TO = "POINT"
-# -----------------------------------------------------------------------------
-# # CURRENT_GOAL_SUCCESS MEASUREMENT
-# -----------------------------------------------------------------------------
-_C.TASK.CURRENT_GOAL_SUCCESS = CN()
-_C.TASK.CURRENT_GOAL_SUCCESS.TYPE = "CurrentGoalSuccess"
-_C.TASK.CURRENT_GOAL_SUCCESS.SUCCESS_DISTANCE = 1.0
-# -----------------------------------------------------------------------------
-# # PROGRESS MEASUREMENT
-# -----------------------------------------------------------------------------
-_C.TASK.PROGRESS = CN()
-_C.TASK.PROGRESS.TYPE = "Progress"
-# -----------------------------------------------------------------------------
-# # MULTION_SUCCESS MEASUREMENT
-# -----------------------------------------------------------------------------
-_C.TASK.MULTION_SUCCESS = CN()
-_C.TASK.MULTION_SUCCESS.TYPE = "MultiONSuccess"
-_C.TASK.MULTION_SUCCESS.SUCCESS_DISTANCE = 0.2
-# -----------------------------------------------------------------------------
-# # MULTION_SPL MEASUREMENT
-# -----------------------------------------------------------------------------
-_C.TASK.MULTION_SPL = CN()
-_C.TASK.MULTION_SPL.TYPE = "MultiONSPL"
-# -----------------------------------------------------------------------------
-# # MULTION_PPL MEASUREMENT
-# -----------------------------------------------------------------------------
-_C.TASK.MULTION_PPL = CN()
-_C.TASK.MULTION_PPL.TYPE = "MultiONPPL"
 # -----------------------------------------------------------------------------
 # # EPISODE_LENGTH MEASUREMENT
 # -----------------------------------------------------------------------------
@@ -305,6 +273,12 @@ _C.TASK.SUB_SUCCESS = CN()
 _C.TASK.SUB_SUCCESS.TYPE = "SubSuccess"
 _C.TASK.SUB_SUCCESS.SUCCESS_DISTANCE = 1.0
 # -----------------------------------------------------------------------------
+# # ORACLE_SUB_SUCCESS MEASUREMENT
+# -----------------------------------------------------------------------------
+_C.TASK.ORACLE_SUB_SUCCESS = CN()
+_C.TASK.ORACLE_SUB_SUCCESS.TYPE = "OracleSubSuccess"
+_C.TASK.ORACLE_SUB_SUCCESS.SUCCESS_DISTANCE = 1.0
+# -----------------------------------------------------------------------------
 # # PERCENTAGE_SUCCESS MEASUREMENT
 # -----------------------------------------------------------------------------
 _C.TASK.PERCENTAGE_SUCCESS = CN()
@@ -316,7 +290,6 @@ _C.TASK.PERCENTAGE_SUCCESS.SUCCESS_DISTANCE = 1.0
 _C.TASK.SUCCESS = CN()
 _C.TASK.SUCCESS.TYPE = "Success"
 _C.TASK.SUCCESS.SUCCESS_DISTANCE = 0.2
-
 # -----------------------------------------------------------------------------
 # MSPL MEASUREMENT
 # -----------------------------------------------------------------------------
