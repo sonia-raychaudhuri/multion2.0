@@ -30,6 +30,8 @@ TASK:
   TYPE: MultiObjectNav-v1
   CYL_OBJECTS_PATH: "data/multion_cyl_objects"
   OBJECTS_TYPE: "CYL"
+  INCLUDE_DISTRACTORS: True
+  ORACLE_MAP_PATH: "data/hm3d_map300.pickle"
   
   POSSIBLE_ACTIONS: ["FOUND", "MOVE_FORWARD", "TURN_LEFT", "TURN_RIGHT"]
 
