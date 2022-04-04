@@ -300,10 +300,10 @@ class MapCNN(nn.Module):
         output_size: The size of the embedding vector
     """
 
-    def __init__(self, map_size, output_size, agent_type):
+    def __init__(self, map_size, output_size, agent_type, _n_input_map=32):
         super().__init__()
        
-        self._n_input_map = 16 if agent_type == "oracle-ego" else 32
+        self._n_input_map = _n_input_map #16 if agent_type == "oracle-ego" else 32
 
 
         if agent_type in ["oracle", "oracle-ego", "no-map"]:

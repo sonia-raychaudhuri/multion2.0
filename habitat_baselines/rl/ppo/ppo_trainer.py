@@ -989,7 +989,8 @@ class PPOTrainerO(BaseRLTrainerOracle):
             device=self.device,
             object_category_embedding_size=self.config.RL.OBJECT_CATEGORY_EMBEDDING_SIZE,
             previous_action_embedding_size=self.config.RL.PREVIOUS_ACTION_EMBEDDING_SIZE,
-            use_previous_action=self.config.RL.PREVIOUS_ACTION
+            use_previous_action=self.config.RL.PREVIOUS_ACTION,
+            config=self.config
         )
         self.actor_critic.to(self.device)
 
