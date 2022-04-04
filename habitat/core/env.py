@@ -134,7 +134,7 @@ class Env:
         self._episode_start_time: Optional[float] = None
         self._episode_over = False
         if config.TRAINER_NAME in ["oracle", "oracle-ego"]:
-            with open('oracle_maps/map300.pickle', 'rb') as handle:
+            with open(config.TASK.ORACLE_MAP_PATH, 'rb') as handle:
                 self.mapCache = pickle.load(handle)
         if config.TRAINER_NAME == "oracle-ego":
             for x,y in self.mapCache.items():
@@ -269,11 +269,11 @@ class Env:
             self._sim.set_translation(np.array(self.current_episode.goals[i].position), ind)
             
             # random rotation only on the Y axis
-            """ y_rotation = mn.Quaternion.rotation(
+            y_rotation = mn.Quaternion.rotation(
                 mn.Rad(random.random() * 2 * math.pi), mn.Vector3(0, 1.0, 0)
             )
             self._sim.set_rotation(y_rotation, ind)
-            self._sim.set_object_motion_type(habitat_sim.physics.MotionType.STATIC, ind) """
+            self._sim.set_object_motion_type(habitat_sim.physics.MotionType.STATIC, ind)
 
         if self._config["TASK"]["INCLUDE_DISTRACTORS"]:
             for i in range(len(self.current_episode.distractors)):
@@ -291,7 +291,7 @@ class Env:
 
         observations = self.task.reset(episode=self.current_episode)
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
-            self.currMap = np.copy(self.mapCache[self.current_episode.scene_id])
+            self.currMap = np.copy(self.mapCache[f"../multiON/{self.current_episode.scene_id}"])
             self.task.occMap = self.currMap[:,:,0]
             self.task.sceneMap = self.currMap[:,:,0]
         self._task.measurements.reset_measures(
@@ -301,12 +301,22 @@ class Env:
         )
 
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
+            # Adding goal information on the map
             for i in range(len(self.current_episode.goals)):
                 loc0 = self.current_episode.goals[i].position[0]
                 loc2 = self.current_episode.goals[i].position[2]
                 grid_loc = self.conv_grid(loc0, loc2)
                 objIndexOffset = 1 if self._config.TRAINER_NAME == "oracle" else 2
                 self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, 1] = object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
+                
+            if self._config["TASK"]["INCLUDE_DISTRACTORS"]:
+                # Adding distractor information on the map
+                distrIndexOffset = len(object_to_datset_mapping) + objIndexOffset + 1
+                for i in range(len(self.current_episode.distractors)):
+                    loc0 = self.current_episode.distractors[i].position[0]
+                    loc2 = self.current_episode.distractors[i].position[2]
+                    grid_loc = self.conv_grid(loc0, loc2)
+                    self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, 1] = object_to_datset_mapping[self.current_episode.distractors[i].object_category] + distrIndexOffset
 
             currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
 
@@ -320,7 +330,7 @@ class Env:
 
             patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40,:]
             patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False)
-            #observations["semMap"] = patch[40-25:40+25, 40-25:40+25, :]
+            observations["semMap"] = patch[40-25:40+25, 40-25:40+25, :]
         return observations
 
     def _update_step_stats(self) -> None:
@@ -354,9 +364,9 @@ class Env:
             self._episode_over is False
         ), "Episode over, call reset before calling step"
 
-        if self._config.RL.ORACLE_FOUND and self._episode_oracle_found():
-            action = 0  # Oracle Found
-        
+        """ if self._config.ORACLE_FOUND and self._episode_oracle_found():
+            action = 0  # Oracle Found """
+            
         self.task.is_found_called = bool(action == 0)
         
         # Support simpler interface as well
@@ -385,7 +395,7 @@ class Env:
                 patch = self.currMap
             patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40,:]
             patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False)
-            #observations["semMap"] = patch[40-25:40+25, 40-25:40+25, :]
+            observations["semMap"] = patch[40-25:40+25, 40-25:40+25, :]
 
         ##Terminates episode if wrong found is called
         if self.task.is_found_called == True and \

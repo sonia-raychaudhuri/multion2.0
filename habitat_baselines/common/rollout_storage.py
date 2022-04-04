@@ -293,11 +293,11 @@ class RolloutStorageOracle:
                 *observation_space.spaces[sensor].shape
             )
 
-        """ self.observations["semMap"] = torch.zeros(
+        self.observations["semMap"] = torch.zeros(
                 num_steps+1, 
                 num_envs,
                 50, 50, 3
-            ) """
+            )
 
         
 

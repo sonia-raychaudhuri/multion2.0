@@ -237,6 +237,7 @@ _C.TASK.ANSWER_ACCURACY.TYPE = "AnswerAccuracy"
 _C.TASK.CYL_OBJECTS_PATH = "data/multion_cyl_objects"
 _C.TASK.REAL_OBJECTS_PATH = "data/multion_real_objects"
 _C.TASK.OBJECTS_TYPE = "CYL" #"REAL" or "CYL"
+_C.TASK.ORACLE_MAP_PATH = "data/hm3d_map300.pickle"
 _C.TASK.INCLUDE_DISTRACTORS = True
 _C.TASK.ACTIONS.FOUND = CN()
 _C.TASK.ACTIONS.FOUND.TYPE = "FoundObjectAction"

@@ -517,7 +517,7 @@ class PPOTrainerNO(BaseRLTrainerNonOracle):
                     writer.add_scalar("metrics/episode_length", metrics["episode_length"], count_steps)
                     writer.add_scalar("metrics/mspl", metrics["mspl"], count_steps)
                     writer.add_scalar("metrics/pspl", metrics["pspl"], count_steps)
-                    writer.add_scalar("metrics/percentage_success", metrics["percentage_success"], count_steps)
+                    writer.add_scalar("metrics/progress", metrics["percentage_success"], count_steps)
                     writer.add_scalar("metrics/success", metrics["success"], count_steps)
                     writer.add_scalar("metrics/sub_success", metrics["sub_success"], count_steps)
 
@@ -821,7 +821,7 @@ class PPOTrainerNO(BaseRLTrainerNonOracle):
         writer.add_scalar("eval/episode_length", metrics["episode_length"], step_id)
         writer.add_scalar("eval/mspl", metrics["mspl"], step_id)
         writer.add_scalar("eval/pspl", metrics["pspl"], step_id)
-        writer.add_scalar("eval/percentage_success", metrics["percentage_success"], step_id)
+        writer.add_scalar("eval/progress", metrics["percentage_success"], step_id)
         writer.add_scalar("eval/success", metrics["success"], step_id)
         writer.add_scalar("eval/sub_success", metrics["sub_success"], step_id)
 
@@ -1361,7 +1361,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
                     writer.add_scalar("metrics/episode_length", metrics["episode_length"], count_steps)
                     writer.add_scalar("metrics/mspl", metrics["mspl"], count_steps)
                     writer.add_scalar("metrics/pspl", metrics["pspl"], count_steps)
-                    writer.add_scalar("metrics/percentage_success", metrics["percentage_success"], count_steps)
+                    writer.add_scalar("metrics/progress", metrics["percentage_success"], count_steps)
                     writer.add_scalar("metrics/success", metrics["success"], count_steps)
                     writer.add_scalar("metrics/sub_success", metrics["sub_success"], count_steps)
 
@@ -1628,7 +1628,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
         writer.add_scalar("eval/episode_length", metrics["episode_length"], step_id)
         writer.add_scalar("eval/mspl", metrics["mspl"], step_id)
         writer.add_scalar("eval/pspl", metrics["pspl"], step_id)
-        writer.add_scalar("eval/percentage_success", metrics["percentage_success"], step_id)
+        writer.add_scalar("eval/progress", metrics["percentage_success"], step_id)
         writer.add_scalar("eval/success", metrics["success"], step_id)
         writer.add_scalar("eval/sub_success", metrics["sub_success"], step_id)
 
@@ -1637,7 +1637,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
         writer.add_scalar("eval/episode_length", metrics["episode_length"], step_id)
         writer.add_scalar("eval/mspl", metrics["mspl"], step_id)
         writer.add_scalar("eval/pspl", metrics["pspl"], step_id)
-        writer.add_scalar("eval/percentage_success", metrics["percentage_success"], step_id)
+        writer.add_scalar("eval/progress", metrics["percentage_success"], step_id)
         writer.add_scalar("eval/success", metrics["success"], step_id)
         writer.add_scalar("eval/sub_success", metrics["sub_success"], step_id)
         
@@ -2278,7 +2278,7 @@ class PPOTrainer(BaseRLTrainer):
             writer.add_scalar("metrics/episode_length", metrics["episode_length"], self.num_steps_done)
             writer.add_scalar("metrics/mspl", metrics["mspl"], self.num_steps_done)
             writer.add_scalar("metrics/pspl", metrics["pspl"], self.num_steps_done)
-            writer.add_scalar("metrics/percentage_success", metrics["percentage_success"], self.num_steps_done)
+            writer.add_scalar("metrics/progress", metrics["percentage_success"], self.num_steps_done)
             writer.add_scalar("metrics/success", metrics["success"], self.num_steps_done)
             writer.add_scalar("metrics/sub_success", metrics["sub_success"], self.num_steps_done)
 
