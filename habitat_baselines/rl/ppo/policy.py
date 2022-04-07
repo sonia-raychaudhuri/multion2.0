@@ -415,7 +415,7 @@ class BaselineNetOracle(Net):
             _n_input_map = 32
             self.occupancy_embedding = nn.Embedding(3, 16)
             self.object_embedding = nn.Embedding(9, 16)
-            if self.config.TASK_CONFIG.TASK.INCLUDE_DISTRACTORS:
+            if self.config.TASK_CONFIG.TASK.INCLUDE_DISTRACTORS and self.config.RL.MAPS.INCLUDE_DISTRACTOR_EMBED:
                 self.distractor_embedding = nn.Embedding(9, 16)
                 _n_input_map += 16
             
@@ -476,7 +476,7 @@ class BaselineNetOracle(Net):
             if self.agent_type == "oracle":
                 global_map_embedding.append(self.occupancy_embedding(global_map[:, :, :, 0].type(torch.LongTensor).to(self.device).view(-1)).view(bs, 50, 50 , -1))
             global_map_embedding.append(self.object_embedding(global_map[:, :, :, 1].type(torch.LongTensor).to(self.device).view(-1)).view(bs, 50, 50, -1))
-            if self.config.TASK_CONFIG.TASK.INCLUDE_DISTRACTORS:
+            if self.config.TASK_CONFIG.TASK.INCLUDE_DISTRACTORS and self.config.RL.MAPS.INCLUDE_DISTRACTOR_EMBED:
                 global_map_embedding.append(self.distractor_embedding(global_map[:, :, :, 2].type(torch.LongTensor)
                                                                         .to(self.device).view(-1)).view(bs, 50, 50, -1))
             global_map_embedding = torch.cat(global_map_embedding, dim=3)
