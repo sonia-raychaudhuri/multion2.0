@@ -339,6 +339,10 @@ class PPOTrainerNO(BaseRLTrainerNonOracle):
                 sum(param.numel() for param in self.agent.parameters())
             )
         )
+        if self.config.RELOAD_CKPT != None:
+            ckpt_dict = self.load_checkpoint(self.config.RELOAD_CKPT, map_location="cpu")
+            self.agent.load_state_dict(ckpt_dict["state_dict"])
+            logger.info("Checkpoint {} loaded!".format(self.config.RELOAD_CKPT))
 
         rollouts = RolloutStorageNonOracle(
             ppo_cfg.num_steps,
@@ -1216,6 +1220,11 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 sum(param.numel() for param in self.agent.parameters())
             )
         )
+        
+        if self.config.RELOAD_CKPT != None:
+            ckpt_dict = self.load_checkpoint(self.config.RELOAD_CKPT, map_location="cpu")
+            self.agent.load_state_dict(ckpt_dict["state_dict"])
+            logger.info("Checkpoint {} loaded!".format(self.config.RELOAD_CKPT))
 
         rollouts = RolloutStorageOracle(
             ppo_cfg.num_steps,

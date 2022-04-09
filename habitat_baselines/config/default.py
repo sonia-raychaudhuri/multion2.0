@@ -48,6 +48,7 @@ _C.VERBOSE = True
 # PyTorch normally behaves, but all configs we provide
 # set it to true and yours likely should too
 _C.FORCE_TORCH_SINGLE_THREADED = False
+_C.RELOAD_CKPT = None
 # -----------------------------------------------------------------------------
 # EVAL CONFIG
 # -----------------------------------------------------------------------------
