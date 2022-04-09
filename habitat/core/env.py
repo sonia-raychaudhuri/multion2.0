@@ -301,22 +301,28 @@ class Env:
         )
 
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
+            channel_num = 1
             # Adding goal information on the map
             for i in range(len(self.current_episode.goals)):
                 loc0 = self.current_episode.goals[i].position[0]
                 loc2 = self.current_episode.goals[i].position[2]
                 grid_loc = self.conv_grid(loc0, loc2)
                 objIndexOffset = 1 if self._config.TRAINER_NAME == "oracle" else 2
-                self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, 1] = object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
+                self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, channel_num] = object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
                 
             if self._config["TASK"]["INCLUDE_DISTRACTORS"]:
-                # Adding distractor information on the map on channel 3
+                if self._config["TASK"]["ORACLE_MAP_INCLUDE_DISTRACTORS_W_GOAL"]:
+                    channel_num = 1
+                else:
+                    channel_num = 2
+                
+                # Adding distractor information on the map
                 distrIndexOffset = 1 if self._config.TRAINER_NAME == "oracle" else 2
                 for i in range(len(self.current_episode.distractors)):
                     loc0 = self.current_episode.distractors[i].position[0]
                     loc2 = self.current_episode.distractors[i].position[2]
                     grid_loc = self.conv_grid(loc0, loc2)
-                    self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, 2] = object_to_datset_mapping[self.current_episode.distractors[i].object_category] + distrIndexOffset
+                    self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, channel_num] = object_to_datset_mapping[self.current_episode.distractors[i].object_category] + distrIndexOffset
 
             currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
 
