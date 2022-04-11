@@ -305,7 +305,6 @@ class Env:
         )
 
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
-            observations["global_occ_map"] = self.currMap[:,:,0]
             channel_num = 1
             # Adding goal information on the map
             for i in range(len(self.current_episode.goals)):
@@ -355,9 +354,7 @@ class Env:
             temp = self.currMap[_low[0]:_high[0], _low[1]:_high[1], :]
             cropped_map[0:temp.shape[0], 0:temp.shape[1], :] = temp
             patch = cropped_map
-            observations["local_occ_map"] = patch[:,:,0]
             patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False)
-            observations["local_rot_occ_map"] = patch[:,:,0]
             
             observations["semMap"] = patch[40-25:40+25, 40-25:40+25, :]
         return observations
@@ -434,12 +431,9 @@ class Env:
             cropped_map[0:temp.shape[0], 0:temp.shape[1], :] = temp
             patch = cropped_map
             #patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40,:]
-            observations["local_occ_map"] = patch[:,:,0]
             patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False)
-            observations["local_rot_occ_map"] = patch[:,:,0]
             observations["semMap"] = patch[40-25:40+25, 40-25:40+25, :]
-            observations["global_occ_map"] = self.currMap[:,:,0]
-
+            
         ##Terminates episode if wrong found is called
         if self.task.is_found_called == True and \
             self.task.measurements.measures[

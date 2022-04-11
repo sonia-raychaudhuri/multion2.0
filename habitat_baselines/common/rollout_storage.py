@@ -298,24 +298,6 @@ class RolloutStorageOracle:
                 num_envs,
                 50, 50, 3
             )
-        
-        self.observations["global_occ_map"] = torch.zeros(
-                num_steps+1, 
-                num_envs,
-                300, 300, 1
-            )
-        
-        self.observations["local_occ_map"] = torch.zeros(
-                num_steps+1, 
-                num_envs,
-                100, 100, 1
-            )
-
-        self.observations["local_rot_occ_map"] = torch.zeros(
-                num_steps+1, 
-                num_envs,
-                100, 100, 1
-            )
 
         self.recurrent_hidden_states = torch.zeros(
             num_steps + 1,
