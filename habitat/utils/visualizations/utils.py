@@ -15,6 +15,9 @@ import tqdm
 from habitat.core.logging import logger
 from habitat.core.utils import try_cv2_import
 from habitat.utils.visualizations import maps
+recolor_map = np.array(
+            [[255, 255, 255], [128, 128, 128], [0,0,0]], dtype=np.uint8
+                )
 
 cv2 = try_cv2_import()
 
@@ -259,7 +262,7 @@ def observations_to_image(observation: Dict, projected_features: np.ndarray=None
         depth_map = depth_map.astype(np.uint8)
         depth_map = np.stack([depth_map for _ in range(3)], axis=2)
         egocentric_view.append(depth_map)
-
+    
     if projected_features is not None and len(projected_features)>0:
         projected_features = cv2.resize(
             projected_features,
@@ -277,7 +280,7 @@ def observations_to_image(observation: Dict, projected_features: np.ndarray=None
             interpolation=cv2.INTER_CUBIC,
         )
         egocentric_view.append(egocentric_projection)
-
+        
     if global_map is not None and len(global_map)>0:
         global_map = cv2.resize(
             global_map,
@@ -327,6 +330,96 @@ def observations_to_image(observation: Dict, projected_features: np.ndarray=None
             interpolation=cv2.INTER_CUBIC,
         )
         frame = np.concatenate((egocentric_view, top_down_map), axis=1)
+        
+        # Oracle Maps
+        if "global_occ_map" in observation:
+            global_occ_map = recolor_map[observation["global_occ_map"].astype(np.uint8)]
+            global_occ_map = maps.draw_agent(
+                image=global_occ_map,
+                agent_center_coord=map_agent_pos,
+                agent_rotation=info["top_down_map"]["agent_angle"],
+                agent_radius_px=global_occ_map.shape[0] // 32,
+            )
+
+            if global_occ_map.shape[0] > global_occ_map.shape[1]:
+                global_occ_map = np.rot90(global_occ_map, 1)
+                
+            old_h, old_w, _ = global_occ_map.shape
+            top_down_height = observation_size
+            top_down_width = int(float(top_down_height) / old_h * old_w)
+            global_occ_map = cv2.resize(
+                global_occ_map,
+                (top_down_width, top_down_height),
+                interpolation=cv2.INTER_CUBIC,
+            )
+            frame = np.concatenate((frame, global_occ_map), axis=1)
+            
+        if "local_occ_map" in observation:
+            local_occ_map = recolor_map[observation["local_occ_map"].astype(np.uint8)]
+            local_occ_map = maps.draw_agent(
+                image=local_occ_map,
+                agent_center_coord=map_agent_pos,
+                agent_rotation=info["top_down_map"]["agent_angle"],
+                agent_radius_px=local_occ_map.shape[0] // 32,
+            )
+
+            if local_occ_map.shape[0] > local_occ_map.shape[1]:
+                local_occ_map = np.rot90(local_occ_map, 1)
+                
+            old_h, old_w, _ = local_occ_map.shape
+            top_down_height = observation_size
+            top_down_width = int(float(top_down_height) / old_h * old_w)
+            local_occ_map = cv2.resize(
+                local_occ_map,
+                (top_down_width, top_down_height),
+                interpolation=cv2.INTER_CUBIC,
+            )
+            frame = np.concatenate((frame, local_occ_map), axis=1)
+        
+        if "local_rot_occ_map" in observation:
+            local_rot_occ_map = recolor_map[observation["local_rot_occ_map"].astype(np.uint8)]
+            local_rot_occ_map = maps.draw_agent(
+                image=local_rot_occ_map,
+                agent_center_coord=map_agent_pos,
+                agent_rotation=info["top_down_map"]["agent_angle"],
+                agent_radius_px=local_rot_occ_map.shape[0] // 32,
+            )
+
+            if local_rot_occ_map.shape[0] > local_rot_occ_map.shape[1]:
+                local_rot_occ_map = np.rot90(local_rot_occ_map, 1)
+                
+            old_h, old_w, _ = local_rot_occ_map.shape
+            top_down_height = observation_size
+            top_down_width = int(float(top_down_height) / old_h * old_w)
+            local_rot_occ_map = cv2.resize(
+                local_rot_occ_map,
+                (top_down_width, top_down_height),
+                interpolation=cv2.INTER_CUBIC,
+            )
+            frame = np.concatenate((frame, local_rot_occ_map), axis=1)
+            
+        if "semMap" in observation:
+            occ_map = recolor_map[observation["semMap"][:,:,0].astype(np.uint8)]
+            occ_map = maps.draw_agent(
+                image=occ_map,
+                agent_center_coord=map_agent_pos,
+                agent_rotation=info["top_down_map"]["agent_angle"],
+                agent_radius_px=occ_map.shape[0] // 32,
+            )
+
+            if occ_map.shape[0] > occ_map.shape[1]:
+                occ_map = np.rot90(occ_map, 1)
+                
+            old_h, old_w, _ = occ_map.shape
+            top_down_height = observation_size
+            top_down_width = int(float(top_down_height) / old_h * old_w)
+            occ_map = cv2.resize(
+                occ_map,
+                (top_down_width, top_down_height),
+                interpolation=cv2.INTER_CUBIC,
+            )
+            frame = np.concatenate((frame, occ_map), axis=1)
+        
     return frame
 
 def append_text_to_image(image: np.ndarray, text: str):
