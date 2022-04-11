@@ -1580,7 +1580,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
 
                 # episode continues
                 elif len(self.config.VIDEO_OPTION) > 0:
-                    frame = observations_to_image(observations[i], infos[i], actions[i].cpu().numpy())
+                    frame = observations_to_image(observations[i], info=infos[i], action=actions[i].cpu().numpy())
                     rgb_frames[i].append(frame)
 
             (

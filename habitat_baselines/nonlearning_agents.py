@@ -5,19 +5,48 @@ import json
 import jsonlines
 from collections import defaultdict
 from tqdm import tqdm, trange
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import habitat
 from habitat.tasks.nav.shortest_path_follower import ShortestPathFollower
 from habitat.sims.habitat_simulator.actions import HabitatSimActions
 from habitat import Config, logger, Agent
-from habitat.utils.visualizations.utils import observations_to_image
+from habitat.utils.visualizations.utils import observations_to_image, append_text_to_image
 from habitat_baselines.common.utils import generate_video
 from habitat_baselines.common.env_utils import construct_envs
 from habitat_baselines.common.environments import get_env_class
 from habitat.core.env import Env
 
 EPSILON = 1e-6
+OBJECT_MAP = {0: 'cylinder_red', 1: 'cylinder_green', 2: 'cylinder_blue', 3: 'cylinder_yellow', 4: 'cylinder_white', 5:'cylinder_pink', 6: 'cylinder_black', 7: 'cylinder_cyan'}
+
+METRICS_BLACKLIST = {"top_down_map", "collisions.is_collision", "raw_metrics", "traj_metrics"}
+
+def extract_scalars_from_info(
+    info: Dict[str, Any]
+) -> Dict[str, float]:
+    result = {}
+    for k, v in info.items():
+        if k in METRICS_BLACKLIST:
+            continue
+
+        if isinstance(v, dict):
+            result.update(
+                {
+                    k + "." + subk: subv
+                    for subk, subv in extract_scalars_from_info(
+                        v
+                    ).items()
+                    if (k + "." + subk) not in METRICS_BLACKLIST
+                }
+            )
+        # Things that are scalar-like will have an np.size of 1.
+        # Strings also have an np.size of 1, so explicitly ban those
+        elif np.size(v) == 1 and not isinstance(v, str):
+            result[k] = float(v)
+
+    return result
 
 def evaluate_agent(config: Config) -> None:
     split = config.EVAL.SPLIT
@@ -25,15 +54,18 @@ def evaluate_agent(config: Config) -> None:
     config.TASK_CONFIG.ENVIRONMENT.ITERATOR_OPTIONS.SHUFFLE = False
     config.TASK_CONFIG.ENVIRONMENT.ITERATOR_OPTIONS.MAX_SCENE_REPEAT_STEPS = -1
     config.TASK_CONFIG.DATASET.SPLIT = split
-    """ if len(config.VIDEO_OPTION) > 0:
+    if len(config.VIDEO_OPTION) > 0:
         config.defrost()
         config.TASK_CONFIG.TASK.MEASUREMENTS.append("TOP_DOWN_MAP")
         config.TASK_CONFIG.TASK.MEASUREMENTS.append("COLLISIONS")
-        os.makedirs(config.VIDEO_DIR, exist_ok=True) """
+        os.makedirs(config.VIDEO_DIR, exist_ok=True)
 
     config.freeze()
+    os.makedirs(config.RESULTS_DIR, exist_ok=True)
+    logger.add_filehandler(config.LOG_FILE)
 
     env = Env(config=config.TASK_CONFIG)
+    #env = construct_envs(config, get_env_class(config.ENV_NAME))
 
     assert config.EVAL.NONLEARNING.AGENT in [
         "OracleAgent",
@@ -64,27 +96,39 @@ def evaluate_agent(config: Config) -> None:
     for _ in trange(num_episodes):
         obs = env.reset()
         agent.reset()
-
+        
         rgb_frames = []
         while not env.episode_over:
-            if len(config.VIDEO_OPTION) > 0:
-                frame = observations_to_image(obs, info=env.get_metrics())
-                rgb_frames.append(frame)
-
             action = agent.act(obs)
+            
             obs = env.step(action)
+
+            if len(config.VIDEO_OPTION) > 0:
+                info=env.get_metrics()
+                frame = observations_to_image(obs, info=info, action=[action])
+                txt_to_show = ('Action: '+ str(action) + 
+                                '; Dist_to_curr_goal:' + str(round(info['distance_to_currgoal'],2)) + 
+                                '; Current Goal:' + str(OBJECT_MAP[obs['multiobjectgoal'][0]]) + 
+                                '; Found_called:' + str(env.task.is_found_called) +
+                                '; Success:' + str(info['success']) +
+                                '; Sub_success:' + str(info['sub_success']) +
+                                '; Progress:' + str(round(info['percentage_success'],2)))
+                
+                frame = append_text_to_image(
+                        frame, txt_to_show
+                    )
+                rgb_frames.append(frame)
 
         metrics_info = env.get_metrics()
         if len(config.VIDEO_OPTION) > 0:
+            #if metrics_info["success"] == 0.0:
             generate_video(
                 video_option=config.VIDEO_OPTION,
                 video_dir=config.VIDEO_DIR,
                 images=rgb_frames,
-                episode_id=env.current_episode.episode_id,
+                episode_id=f"{os.path.basename(env.current_episode.scene_id)}_{env.current_episode.episode_id}",
                 checkpoint_idx=0,
-                metrics={
-                    "episode": float(env.current_episode.episode_id)
-                },
+                metrics=extract_scalars_from_info(metrics_info),
                 tb_writer=None,
             )
 
@@ -95,16 +139,21 @@ def evaluate_agent(config: Config) -> None:
         if "raw_metrics" in metrics_info:
             del metrics_info["raw_metrics"]
         
-        episode_stats[env.current_episode.episode_id] = metrics_info
+        episode_stats[f"{env.current_episode.scene_id}_{env.current_episode.episode_id}"] = metrics_info
+        
+        logger.info(f"Episode: {env.current_episode.scene_id}_{env.current_episode.episode_id}")
+        for k,v in metrics_info.items():
+            logger.info("{}: {:.3f}".format(k, v))
         
         for m, v in metrics_info.items():
             stats[m] += v
 
-    os.makedirs(config.RESULTS_DIR, exist_ok=True)
     with open(os.path.join(config.RESULTS_DIR, f"episode_stats_{config.EVAL.NONLEARNING.AGENT}_{split}.json"), "w") as f:
         json.dump(episode_stats, f, indent=4)
 
-    stats = {k: v / num_episodes for k, v in stats.items()}
+    num_good_episodes = num_episodes
+    stats = {k: v / num_good_episodes for k, v in stats.items()}
+    stats["num_episodes"] = num_good_episodes
 
     logger.info(f"Averaged benchmark for {config.EVAL.NONLEARNING.AGENT}:")
     for stat_key in stats.keys():
@@ -196,17 +245,30 @@ class HandcraftedAgent(Agent):
 
 class OracleAgent(habitat.Agent):
     def __init__(self, task_config: habitat.Config, env):
-        self._POSSIBLE_ACTIONS = task_config.TASK.POSSIBLE_ACTIONS
+        self.actions = [
+            HabitatSimActions.MOVE_FORWARD,
+            HabitatSimActions.TURN_LEFT,
+            HabitatSimActions.TURN_RIGHT,
+        ]
         self.env = env
 
     def reset(self):
         self.follower = ShortestPathFollower(
-            self.env.sim, goal_radius=0.25, return_one_hot=False
+            self.env.sim, goal_radius=0.25, return_one_hot=False,
+            stop_on_error=False #debugging
         )
+        self.num_tries = 10
 
     def act(self, observations):
         current_goal = self.env.task.current_goal_index
-        best_action = self.follower.get_next_action(self.env.current_episode.goals[current_goal].position)
+        
+        best_action = 0
+        try:
+            best_action = self.follower.get_next_action(self.env.current_episode.goals[current_goal].position)
+        except:
+            while self.num_tries > 0:
+                best_action = np.random.choice(self.actions)
+                self.num_tries -= 1
                 
         return best_action
 

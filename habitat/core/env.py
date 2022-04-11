@@ -14,6 +14,8 @@ import numpy as np
 from gym import spaces
 from scipy import ndimage
 import math
+import torch
+import torch.nn.functional as F
 
 from habitat.config import Config
 from habitat.core.dataset import Dataset, Episode, EpisodeIterator
@@ -25,6 +27,7 @@ from habitat.tasks import make_task
 from habitat.utils import profiling_wrapper
 import habitat_sim
 import magnum as mn
+from habitat.utils.visualizations import maps
 
 
 class Env:
@@ -133,6 +136,9 @@ class Env:
         self._elapsed_steps = 0
         self._episode_start_time: Optional[float] = None
         self._episode_over = False
+        self._map_resolution = 300
+        self.meters_per_pixel = 0.1
+        self.cropped_map_size = 80
         if config.TRAINER_NAME in ["oracle", "oracle-ego"]:
             with open(config.TASK.ORACLE_MAP_PATH, 'rb') as handle:
                 self.mapCache = pickle.load(handle)
@@ -211,28 +217,7 @@ class Env:
         self._episode_start_time = time.time()
         self._elapsed_steps = 0
         self._episode_over = False
-
-    def conv_grid(
-        self,
-        realworld_x,
-        realworld_y,
-        coordinate_min = -120.3241-1e-6,
-        coordinate_max = 120.0399+1e-6,
-        grid_resolution = (300, 300)
-    ):
-        r"""Return gridworld index of realworld coordinates assuming top-left corner
-        is the origin. The real world coordinates of lower left corner are
-        (coordinate_min, coordinate_min) and of top right corner are
-        (coordinate_max, coordinate_max)
-        """
-        grid_size = (
-            (coordinate_max - coordinate_min) / grid_resolution[0],
-            (coordinate_max - coordinate_min) / grid_resolution[1],
-        )
-        grid_x = int((coordinate_max - realworld_x) / grid_size[0])
-        grid_y = int((realworld_y - coordinate_min) / grid_size[1])
-        return grid_x, grid_y
-
+    
     def reset(self) -> Observations:
         r"""Resets the environments and returns the initial observations.
 
@@ -291,7 +276,26 @@ class Env:
 
         observations = self.task.reset(episode=self.current_episode)
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
-            self.currMap = np.copy(self.mapCache[f"../multiON/{self.current_episode.scene_id}"])
+            #self.currMap = np.copy(self.mapCache[f"../multiON/{self.current_episode.scene_id}"])
+            top_down_map = maps.get_topdown_map_from_sim(
+                self._sim,
+                draw_border=False,
+                meters_per_pixel=self.meters_per_pixel
+            )
+            range_x = np.where(np.any(top_down_map, axis=1))[0]
+            range_y = np.where(np.any(top_down_map, axis=0))[0]
+            padding = int(np.ceil(top_down_map.shape[0] / 400))
+            range_x = (
+                max(range_x[0] - padding, 0),
+                min(range_x[-1] + padding + 1, top_down_map.shape[0]),
+            )
+            range_y = (
+                max(range_y[0] - padding, 0),
+                min(range_y[-1] + padding + 1, top_down_map.shape[1]),
+            )
+            top_down_map[range_x[0] : range_x[1], range_y[0] : range_y[1]] += 1
+            self.currMap = np.zeros((top_down_map.shape[0],top_down_map.shape[1],3))
+            self.currMap[:,:,0] = top_down_map
             self.task.occMap = self.currMap[:,:,0]
             self.task.sceneMap = self.currMap[:,:,0]
         self._task.measurements.reset_measures(
@@ -301,12 +305,16 @@ class Env:
         )
 
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
+            observations["global_occ_map"] = self.currMap[:,:,0]
             channel_num = 1
             # Adding goal information on the map
             for i in range(len(self.current_episode.goals)):
-                loc0 = self.current_episode.goals[i].position[0]
-                loc2 = self.current_episode.goals[i].position[2]
-                grid_loc = self.conv_grid(loc0, loc2)
+                grid_loc = maps.to_grid(
+                    self.current_episode.goals[i].position[2],
+                    self.current_episode.goals[i].position[0],
+                    self.currMap.shape[0:2],
+                    sim=self._sim,
+                )
                 objIndexOffset = 1 if self._config.TRAINER_NAME == "oracle" else 2
                 self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, channel_num] = object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
                 
@@ -319,12 +327,20 @@ class Env:
                 # Adding distractor information on the map
                 distrIndexOffset = 1 if self._config.TRAINER_NAME == "oracle" else 2
                 for i in range(len(self.current_episode.distractors)):
-                    loc0 = self.current_episode.distractors[i].position[0]
-                    loc2 = self.current_episode.distractors[i].position[2]
-                    grid_loc = self.conv_grid(loc0, loc2)
+                    grid_loc = maps.to_grid(
+                        self.current_episode.distractors[i].position[2],
+                        self.current_episode.distractors[i].position[0],
+                        self.currMap.shape[0:2],
+                        sim=self._sim,
+                    )
                     self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, channel_num] = object_to_datset_mapping[self.current_episode.distractors[i].object_category] + distrIndexOffset
 
-            currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+            currPix = maps.to_grid(
+                    observations["agent_position"][2],
+                    observations["agent_position"][0],
+                    self.currMap.shape[0:2],
+                    sim=self._sim,
+                )
 
             if self._config.TRAINER_NAME == "oracle-ego":
                 self.expose = np.repeat(
@@ -332,10 +348,17 @@ class Env:
                 )
                 patch = self.currMap * self.expose
             elif self._config.TRAINER_NAME == "oracle":
-                patch = self.currMap
+                cropped_map = np.zeros((self.cropped_map_size,self.cropped_map_size,3))
 
-            patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40,:]
+            _low, _high = (np.minimum(np.maximum(np.array(currPix)-40,np.zeros(len(currPix))),np.array(self.currMap.shape[0:2])-1).astype(np.int),
+                           np.minimum(np.maximum(np.array(currPix)+40,np.zeros(len(currPix))),np.array(self.currMap.shape[0:2])-1).astype(np.int))
+            temp = self.currMap[_low[0]:_high[0], _low[1]:_high[1], :]
+            cropped_map[0:temp.shape[0], 0:temp.shape[1], :] = temp
+            patch = cropped_map
+            observations["local_occ_map"] = patch[:,:,0]
             patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False)
+            observations["local_rot_occ_map"] = patch[:,:,0]
+            
             observations["semMap"] = patch[40-25:40+25, 40-25:40+25, :]
         return observations
 
@@ -391,17 +414,31 @@ class Env:
         )
 
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
-            currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+            currPix = maps.to_grid(
+                    observations["agent_position"][2],
+                    observations["agent_position"][0],
+                    self.currMap.shape[0:2],
+                    sim=self._sim,
+                )
             if self._config.TRAINER_NAME == "oracle-ego":
                 self.expose = np.repeat(
                     self.task.measurements.measures["fow_map"].get_metric()[:, :, np.newaxis], 3, axis = 2
                 )
                 patch = self.currMap * self.expose
             elif self._config.TRAINER_NAME == "oracle":
-                patch = self.currMap
-            patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40,:]
+                cropped_map = np.zeros((self.cropped_map_size,self.cropped_map_size,3))
+                
+            _low, _high = (np.minimum(np.maximum(np.array(currPix)-40,np.zeros(len(currPix))),np.array(self.currMap.shape[0:2])-1).astype(np.int),
+                           np.minimum(np.maximum(np.array(currPix)+40,np.zeros(len(currPix))),np.array(self.currMap.shape[0:2])-1).astype(np.int))
+            temp = self.currMap[_low[0]:_high[0], _low[1]:_high[1], :]
+            cropped_map[0:temp.shape[0], 0:temp.shape[1], :] = temp
+            patch = cropped_map
+            #patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40,:]
+            observations["local_occ_map"] = patch[:,:,0]
             patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False)
+            observations["local_rot_occ_map"] = patch[:,:,0]
             observations["semMap"] = patch[40-25:40+25, 40-25:40+25, :]
+            observations["global_occ_map"] = self.currMap[:,:,0]
 
         ##Terminates episode if wrong found is called
         if self.task.is_found_called == True and \

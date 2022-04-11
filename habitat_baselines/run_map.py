@@ -10,7 +10,11 @@ import random
 import numpy as np
 import torch
 from habitat_baselines.common.baseline_registry import baseline_registry
-from habitat_baselines.config.default import get_config    
+from habitat_baselines.config.default import get_config
+from habitat_baselines.nonlearning_agents import (
+    evaluate_agent,
+)
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -83,6 +87,10 @@ def run_exp(exp_config: str, run_type: str, agent_type: str, opts=None) -> None:
         
     assert trainer_init is not None, f"{config.TRAINER_NAME} is not supported"
     trainer = trainer_init(config)
+
+    if run_type == "eval" and config.EVAL.EVAL_NONLEARNING:
+        evaluate_agent(config)
+        return
 
     if run_type == "train":
         trainer.train()

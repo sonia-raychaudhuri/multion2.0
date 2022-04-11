@@ -1301,11 +1301,10 @@ class FowMap(Measure):
     def update_metric(self, *args: Any, episode, task: EmbodiedTask, **kwargs: Any):
         agent_position = self._sim.get_agent_state().position
         a_x, a_y = maps.to_grid(
-            agent_position[0],
             agent_position[2],
-            self._coordinate_min,
-            self._coordinate_max,
-            self._map_resolution,
+            agent_position[0],
+            self._top_down_map.shape[0:2],
+            sim=self._sim,
         )
         agent_position = np.array([a_x, a_y])
 
