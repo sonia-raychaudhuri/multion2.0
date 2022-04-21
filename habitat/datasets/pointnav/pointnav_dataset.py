@@ -17,6 +17,7 @@ from habitat.tasks.nav.nav import (
     NavigationGoal,
     ShortestPathPoint,
 )
+from habitat.core.logging import logger
 
 CONTENT_SCENES_PATH_FIELD = "content_scenes_path"
 DEFAULT_SCENE_PATH_PREFIX = "data/scene_datasets/"
@@ -40,6 +41,7 @@ class PointNavDatasetV1(Dataset):
         r"""Return list of scene ids for which dataset has separate files with
         episodes.
         """
+        
         assert cls.check_config_paths_exist(config)
         dataset_dir = os.path.dirname(
             config.DATA_PATH.format(split=config.SPLIT)
@@ -119,6 +121,8 @@ class PointNavDatasetV1(Dataset):
             self.episodes = list(
                 filter(self.build_content_scenes_filter(config), self.episodes)
             )
+            
+        logger.info(f"Number of episodes = {len(self.episodes)}")
 
     def from_json(
         self, json_str: str, scenes_dir: Optional[str] = None
