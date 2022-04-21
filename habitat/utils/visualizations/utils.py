@@ -331,84 +331,105 @@ def observations_to_image(observation: Dict, projected_features: np.ndarray=None
         )
         frame = np.concatenate((egocentric_view, top_down_map), axis=1)
         
-        # Oracle Maps
+        # Debug Oracle Maps
         if "global_occ_map" in observation:
-            global_occ_map = recolor_map[observation["global_occ_map"].astype(np.uint8)]
+            map = observation["global_occ_map"]
+            map_size = map.shape
+            currPix = observation["agent_position_grid"]
+            map[currPix[0],currPix[1]] = 2
+            tmp = np.transpose(np.where(map==100))
+            for t in tmp:
+                map[t[0],t[1]] = 2
+            global_occ_map = recolor_map[map.astype(np.uint8)]
             global_occ_map = maps.draw_agent(
                 image=global_occ_map,
-                agent_center_coord=map_agent_pos,
+                agent_center_coord=currPix,
                 agent_rotation=info["top_down_map"]["agent_angle"],
-                agent_radius_px=global_occ_map.shape[0] // 32,
+                agent_radius_px=2, #global_occ_map.shape[0] // 28,
             )
 
-            if global_occ_map.shape[0] > global_occ_map.shape[1]:
-                global_occ_map = np.rot90(global_occ_map, 1)
-                
-            old_h, old_w, _ = global_occ_map.shape
-            top_down_height = observation_size
-            top_down_width = int(float(top_down_height) / old_h * old_w)
             global_occ_map = cv2.resize(
                 global_occ_map,
-                (top_down_width, top_down_height),
-                interpolation=cv2.INTER_CUBIC,
+                (top_down_width, top_down_height-10),
+                interpolation=cv2.INTER_NEAREST,
             )
+            bordersize = 5
+            global_occ_map = cv2.copyMakeBorder(
+                global_occ_map,
+                top=bordersize,
+                bottom=bordersize,
+                left=bordersize,
+                right=bordersize,
+                borderType=cv2.BORDER_CONSTANT,
+                value=[200, 0, 0]
+            )
+            global_occ_map = cv2.putText(global_occ_map, f'Global_{map_size}', 
+                                         (top_down_width-200, top_down_height-50), cv2.FONT_HERSHEY_SIMPLEX, 
+                                         0.7, (255, 0, 0), 2, cv2.LINE_AA)
             frame = np.concatenate((frame, global_occ_map), axis=1)
             
         if "local_occ_map" in observation:
-            local_occ_map = recolor_map[observation["local_occ_map"].astype(np.uint8)]
+            map = observation["local_occ_map"]
+            map_size = map.shape
+            if len(np.where(map==100)[0]) > 0:
+                tmp = np.transpose(np.where(map==100))
+                for t in tmp:
+                    map[t[0],t[1]] = 2
+                    currPix = t
+                    map[currPix[0],currPix[1]] = 2
+            else:
+                currPix = (40,40)
+                
+            local_occ_map = recolor_map[map.astype(np.uint8)]
+            
             local_occ_map = maps.draw_agent(
                 image=local_occ_map,
-                agent_center_coord=map_agent_pos,
+                agent_center_coord=(local_occ_map.shape[0] // 2, local_occ_map.shape[1] // 2),
                 agent_rotation=info["top_down_map"]["agent_angle"],
-                agent_radius_px=local_occ_map.shape[0] // 32,
+                agent_radius_px=2,
             )
 
-            if local_occ_map.shape[0] > local_occ_map.shape[1]:
-                local_occ_map = np.rot90(local_occ_map, 1)
-                
-            old_h, old_w, _ = local_occ_map.shape
-            top_down_height = observation_size
-            top_down_width = int(float(top_down_height) / old_h * old_w)
+            #ocal_occ_map = np.rot90(local_occ_map, 1)
+
             local_occ_map = cv2.resize(
                 local_occ_map,
-                (top_down_width, top_down_height),
-                interpolation=cv2.INTER_CUBIC,
+                (top_down_width, top_down_height-10),
+                interpolation=cv2.INTER_NEAREST,
             )
+            
+            bordersize = 5
+            local_occ_map = cv2.copyMakeBorder(
+                local_occ_map,
+                top=bordersize,
+                bottom=bordersize,
+                left=bordersize,
+                right=bordersize,
+                borderType=cv2.BORDER_CONSTANT,
+                value=[200, 0, 0]
+            )
+            local_occ_map = cv2.putText(local_occ_map, f'Cropped_{map_size}', 
+                                         (top_down_width-200, top_down_height-50), cv2.FONT_HERSHEY_SIMPLEX, 
+                                         0.7, (255, 0, 0), 2, cv2.LINE_AA)
             frame = np.concatenate((frame, local_occ_map), axis=1)
         
-        if "local_rot_occ_map" in observation:
-            local_rot_occ_map = recolor_map[observation["local_rot_occ_map"].astype(np.uint8)]
-            local_rot_occ_map = maps.draw_agent(
-                image=local_rot_occ_map,
-                agent_center_coord=map_agent_pos,
-                agent_rotation=info["top_down_map"]["agent_angle"],
-                agent_radius_px=local_rot_occ_map.shape[0] // 32,
-            )
-
-            if local_rot_occ_map.shape[0] > local_rot_occ_map.shape[1]:
-                local_rot_occ_map = np.rot90(local_rot_occ_map, 1)
-                
-            old_h, old_w, _ = local_rot_occ_map.shape
-            top_down_height = observation_size
-            top_down_width = int(float(top_down_height) / old_h * old_w)
-            local_rot_occ_map = cv2.resize(
-                local_rot_occ_map,
-                (top_down_width, top_down_height),
-                interpolation=cv2.INTER_CUBIC,
-            )
-            frame = np.concatenate((frame, local_rot_occ_map), axis=1)
+        """ if "local_rot_occ_map" in observation:
+            map = observation["local_rot_occ_map"]
+            map_size = map.shape
+            if len(np.where(map==100)[0]) > 0:
+                currPix = np.transpose(np.where(map==100))[0] #observation["agent_position_grid"]
+                map[currPix[0],currPix[1]] = 2
+            tmp = np.transpose(np.where(map==100))
+            for t in tmp:
+                map[t[0],t[1]] = 2
+            occ_map = recolor_map[map.astype(np.uint8)]
             
-        if "semMap" in observation:
-            occ_map = recolor_map[observation["semMap"][:,:,0].astype(np.uint8)]
-            occ_map = maps.draw_agent(
-                image=occ_map,
-                agent_center_coord=map_agent_pos,
-                agent_rotation=info["top_down_map"]["agent_angle"],
-                agent_radius_px=occ_map.shape[0] // 32,
-            )
-
-            if occ_map.shape[0] > occ_map.shape[1]:
-                occ_map = np.rot90(occ_map, 1)
+            if len(np.where(map==100)[0]) > 0:
+                occ_map = maps.draw_agent(
+                    image=occ_map,
+                    agent_center_coord=currPix,
+                    agent_rotation=info["top_down_map"]["agent_angle"],
+                    agent_radius_px=occ_map.shape[0] // 16,
+                )
                 
             old_h, old_w, _ = occ_map.shape
             top_down_height = observation_size
@@ -416,8 +437,52 @@ def observations_to_image(observation: Dict, projected_features: np.ndarray=None
             occ_map = cv2.resize(
                 occ_map,
                 (top_down_width, top_down_height),
-                interpolation=cv2.INTER_CUBIC,
+                interpolation=cv2.INTER_NEAREST,
             )
+            occ_map = cv2.putText(occ_map, f'Rotated_{map_size}', 
+                                         (top_down_width-200, top_down_height-50), cv2.FONT_HERSHEY_SIMPLEX, 
+                                         0.7, (255, 0, 0), 2, cv2.LINE_AA)
+            frame = np.concatenate((frame, occ_map), axis=1) """
+            
+        if "semMap" in observation:
+            map = observation["semMap"][:,:,0]
+            map_size = map.shape
+            if len(np.where(map==100)[0]) > 0:
+                currPix = np.transpose(np.where(map==100))[0] #observation["agent_position_grid"]
+                map[currPix[0],currPix[1]] = 2
+            tmp = np.transpose(np.where(map==100))
+            for t in tmp:
+                map[t[0],t[1]] = 2
+            occ_map = recolor_map[map.astype(np.uint8)]
+            
+            #if len(np.where(map==100)[0]) > 0:
+            occ_map = maps.draw_agent(
+                image=occ_map,
+                agent_center_coord=(occ_map.shape[0] // 2, occ_map.shape[1] // 2),
+                agent_rotation=info["top_down_map"]["agent_angle"],
+                agent_radius_px=2,
+            )
+            
+            #occ_map = np.rot90(occ_map, 1)
+            occ_map = cv2.resize(
+                occ_map,
+                (top_down_width, top_down_height-10),
+                interpolation=cv2.INTER_NEAREST,
+            )
+
+            bordersize = 5
+            occ_map = cv2.copyMakeBorder(
+                occ_map,
+                top=bordersize,
+                bottom=bordersize,
+                left=bordersize,
+                right=bordersize,
+                borderType=cv2.BORDER_CONSTANT,
+                value=[200, 0, 0]
+            )
+            occ_map = cv2.putText(occ_map, f'Rotated_{map_size}', 
+                                         (top_down_width-200, top_down_height-50), cv2.FONT_HERSHEY_SIMPLEX, 
+                                         0.7, (255, 0, 0), 2, cv2.LINE_AA)
             frame = np.concatenate((frame, occ_map), axis=1)
         
     return frame
