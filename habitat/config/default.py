@@ -240,6 +240,7 @@ _C.TASK.OBJECTS_TYPE = "CYL" #"REAL" or "CYL"
 _C.TASK.ORACLE_MAP_PATH = "data/hm3d_map300.pickle"
 _C.TASK.INCLUDE_DISTRACTORS = True
 _C.TASK.ORACLE_MAP_INCLUDE_DISTRACTORS_W_GOAL = True
+_C.TASK.NUM_DISTRACTORS = -1
 _C.TASK.ACTIONS.FOUND = CN()
 _C.TASK.ACTIONS.FOUND.TYPE = "FoundObjectAction"
 # -----------------------------------------------------------------------------

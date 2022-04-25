@@ -105,8 +105,9 @@ _C.RL.MAPS = CN()
 _C.RL.MAPS.egocentric_map_size = 3
 _C.RL.MAPS.global_map_size = 250
 _C.RL.MAPS.global_map_depth = 32
-_C.RL.MAPS.coordinate_min = -62.3241 - 1e-6
-_C.RL.MAPS.coordinate_max = 90.0399 + 1e-6
+COORDINATE_EPSILON = 1e-6
+_C.RL.MAPS.coordinate_min = -62.3241 - COORDINATE_EPSILON
+_C.RL.MAPS.coordinate_max = 90.0399 + COORDINATE_EPSILON
 # -----------------------------------------------------------------------------
 # DECENTRALIZED DISTRIBUTED PROXIMAL POLICY OPTIMIZATION (DD-PPO)
 # -----------------------------------------------------------------------------

@@ -32,7 +32,6 @@ import magnum as mn
 COORDINATE_EPSILON = 1e-6
 COORDINATE_MIN = -62.3241 - COORDINATE_EPSILON
 COORDINATE_MAX = 90.0399 + COORDINATE_EPSILON
-#
 
 class Env:
     r"""Fundamental environment class for :ref:`habitat`.
@@ -319,7 +318,7 @@ class Env:
                 loc2 = self.current_episode.goals[i].position[2]
                 grid_loc = self.conv_grid(loc0, loc2)
                 objIndexOffset = 1 if self._config.TRAINER_NAME == "oracle" else 2
-                self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, channel_num] = object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
+                self.currMap[grid_loc[0]-1:grid_loc[0], grid_loc[1]-1:grid_loc[1], channel_num] = object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
                 
             if self._config["TASK"]["INCLUDE_DISTRACTORS"]:
                 if self._config["TASK"]["ORACLE_MAP_INCLUDE_DISTRACTORS_W_GOAL"]:
@@ -329,7 +328,8 @@ class Env:
                 
                 # Adding distractor information on the map
                 distrIndexOffset = 1 if self._config.TRAINER_NAME == "oracle" else 2
-                for i in range(len(self.current_episode.distractors)):
+                num_distr = self._config["TASK"]["NUM_DISTRACTORS"] if self._config["TASK"]["NUM_DISTRACTORS"] > 0 else len(self.current_episode.distractors)
+                for i in range(num_distr):
                     loc0 = self.current_episode.distractors[i].position[0]
                     loc2 = self.current_episode.distractors[i].position[2]
                     grid_loc = self.conv_grid(loc0, loc2)
@@ -348,7 +348,10 @@ class Env:
             patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40,:]
             patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False)
             
-            observations["semMap"] = patch[40-25:40+25, 40-25:40+25, :]
+            sem_map = patch[40-25:40+25, 40-25:40+25, :]
+            if sem_map.shape[0] == 0 or sem_map.shape[1] == 0:
+                sem_map = np.zeros((50,50,3))
+            observations["semMap"] = sem_map
             
         return observations
 
@@ -417,7 +420,10 @@ class Env:
             patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40,:]
             
             patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False)
-            observations["semMap"] = patch[40-25:40+25, 40-25:40+25, :]
+            sem_map = patch[40-25:40+25, 40-25:40+25, :]
+            if sem_map.shape[0] == 0 or sem_map.shape[1] == 0:
+                sem_map = np.zeros((50,50,3))
+            observations["semMap"] = sem_map
             
         ##Terminates episode if wrong found is called
         if self.task.is_found_called == True and \
