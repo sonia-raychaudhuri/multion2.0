@@ -50,5 +50,5 @@ RL:
     egocentric_map_size: 13 # 3 x 3
     global_map_size: 275
     global_map_depth: 32
-    coordinate_min: -110.0
-    coordinate_max:  110.0
+    coordinate_min: -62.3241
+    coordinate_max: 90.0399
