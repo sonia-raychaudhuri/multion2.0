@@ -310,7 +310,6 @@ class Env:
         )
 
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
-            
             channel_num = 1
             # Adding goal information on the map
             for i in range(len(self.current_episode.goals)):
@@ -318,7 +317,7 @@ class Env:
                 loc2 = self.current_episode.goals[i].position[2]
                 grid_loc = self.conv_grid(loc0, loc2)
                 objIndexOffset = 1 if self._config.TRAINER_NAME == "oracle" else 2
-                self.currMap[grid_loc[0]-1:grid_loc[0], grid_loc[1]-1:grid_loc[1], channel_num] = object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
+                self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, channel_num] = object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
                 
             if self._config["TASK"]["INCLUDE_DISTRACTORS"]:
                 if self._config["TASK"]["ORACLE_MAP_INCLUDE_DISTRACTORS_W_GOAL"]:

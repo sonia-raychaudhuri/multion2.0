@@ -15,6 +15,9 @@ from habitat_baselines.rl.models.rnn_state_encoder import RNNStateEncoder
 from habitat_baselines.rl.models.simple_cnn import RGBCNNNonOracle, RGBCNNOracle, MapCNN
 from habitat_baselines.rl.models.projection import Projection
 
+from habitat.core.utils import try_cv2_import
+cv2 = try_cv2_import()
+
 class PolicyNonOracle(nn.Module):
     def __init__(self, net, dim_actions):
         super().__init__()
@@ -473,9 +476,18 @@ class BaselineNetOracle(Net):
         if self.agent_type != "no-map":
             global_map_embedding = []
             global_map = observations['semMap']
+            
             if self.agent_type == "oracle":
                 global_map_embedding.append(self.occupancy_embedding(global_map[:, :, :, 0].type(torch.LongTensor).to(self.device).view(-1)).view(bs, 50, 50 , -1))
-            global_map_embedding.append(self.object_embedding(global_map[:, :, :, 1].type(torch.LongTensor).to(self.device).view(-1)).view(bs, 50, 50, -1))
+                
+            if self.config.RL.MAPS.NEXT_GOAL_IND:
+                # Derive map with next goal from goal category and oracle map with goals and/or distractors
+                obj_cat_map = global_map[:,:,:,1]
+                goal_map = (obj_cat_map == ((target_encoding + 1).unsqueeze(1))).type(torch.LongTensor) # Adding one to match categories in oracle map
+                global_map_embedding.append(self.object_embedding(goal_map.to(self.device).view(-1)).view(bs, 50, 50, -1))
+            else:
+                global_map_embedding.append(self.object_embedding(global_map[:, :, :, 1].type(torch.LongTensor).to(self.device).view(-1)).view(bs, 50, 50, -1))
+            
             if self.config.TASK_CONFIG.TASK.INCLUDE_DISTRACTORS and self.config.RL.MAPS.INCLUDE_DISTRACTOR_EMBED:
                 global_map_embedding.append(self.distractor_embedding(global_map[:, :, :, 2].type(torch.LongTensor)
                                                                         .to(self.device).view(-1)).view(bs, 50, 50, -1))
