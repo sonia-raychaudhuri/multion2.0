@@ -1285,12 +1285,26 @@ class FowMap(Measure):
         self._sim = sim
         self._config = config
         self._map_resolution = (300, 300)
-        self._coordinate_min = -120.3241-1e-6
-        self._coordinate_max = 120.0399+1e-6
+        self._coordinate_min = -62.3241-1e-6
+        self._coordinate_max = 90.0399+1e-6
         super().__init__()
 
     def _get_uuid(self, *args: Any, **kwargs: Any):
         return "fow_map"
+
+    def conv_grid(
+        self,
+        realworld_x,
+        realworld_y
+    ):
+
+        grid_size = (
+            (self._coordinate_max - self._coordinate_min) / self._map_resolution[0],
+            (self._coordinate_max - self._coordinate_min) / self._map_resolution[1],
+        )
+        grid_x = int((self._coordinate_max - realworld_x) / grid_size[0])
+        grid_y = int((realworld_y - self._coordinate_min) / grid_size[1])
+        return grid_x, grid_y
 
     def reset_metric(self, *args: Any, episode, task, **kwargs: Any):
         self._metric = None
@@ -1300,11 +1314,9 @@ class FowMap(Measure):
 
     def update_metric(self, *args: Any, episode, task: EmbodiedTask, **kwargs: Any):
         agent_position = self._sim.get_agent_state().position
-        a_x, a_y = maps.to_grid(
+        a_x, a_y = self.conv_grid(
             agent_position[2],
-            agent_position[0],
-            self._top_down_map.shape[0:2],
-            sim=self._sim,
+            agent_position[0]
         )
         agent_position = np.array([a_x, a_y])
 

@@ -339,9 +339,13 @@ class PPOTrainerNO(BaseRLTrainerNonOracle):
                 sum(param.numel() for param in self.agent.parameters())
             )
         )
+        
+        count_steps = 0
         if self.config.RELOAD_CKPT != None:
             ckpt_dict = self.load_checkpoint(self.config.RELOAD_CKPT, map_location="cpu")
             self.agent.load_state_dict(ckpt_dict["state_dict"])
+            if "extra_state" in ckpt_dict and "step" in ckpt_dict["extra_state"]:
+                count_steps = ckpt_dict["extra_state"]["step"]
             logger.info("Checkpoint {} loaded!".format(self.config.RELOAD_CKPT))
 
         rollouts = RolloutStorageNonOracle(
@@ -379,7 +383,6 @@ class PPOTrainerNO(BaseRLTrainerNonOracle):
         t_start = time.time()
         env_time = 0
         pth_time = 0
-        count_steps = 0
         count_checkpoints = 0
 
         lr_scheduler = LambdaLR(
@@ -1221,9 +1224,12 @@ class PPOTrainerO(BaseRLTrainerOracle):
             )
         )
         
+        count_steps = 0
         if self.config.RELOAD_CKPT != None:
             ckpt_dict = self.load_checkpoint(self.config.RELOAD_CKPT, map_location="cpu")
             self.agent.load_state_dict(ckpt_dict["state_dict"])
+            if "extra_state" in ckpt_dict and "step" in ckpt_dict["extra_state"]:
+                count_steps = ckpt_dict["extra_state"]["step"]
             logger.info("Checkpoint {} loaded!".format(self.config.RELOAD_CKPT))
 
         rollouts = RolloutStorageOracle(

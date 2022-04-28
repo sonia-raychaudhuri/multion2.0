@@ -51,7 +51,7 @@ def extract_scalars_from_info(
 def evaluate_agent(config: Config) -> None:
     split = config.EVAL.SPLIT
     config.defrost()
-    config.TASK_CONFIG.ENVIRONMENT.ITERATOR_OPTIONS.SHUFFLE = False
+    config.TASK_CONFIG.ENVIRONMENT.ITERATOR_OPTIONS.SHUFFLE = False #True
     config.TASK_CONFIG.ENVIRONMENT.ITERATOR_OPTIONS.MAX_SCENE_REPEAT_STEPS = -1
     config.TASK_CONFIG.DATASET.SPLIT = split
     if len(config.VIDEO_OPTION) > 0:
@@ -107,6 +107,7 @@ def evaluate_agent(config: Config) -> None:
                 info=env.get_metrics()
                 frame = observations_to_image(obs, info=info, action=[action])
                 txt_to_show = ('Action: '+ str(action) + 
+                                '; Dist_to_multi_goal:' + str(round(info['distance_to_multi_goal'],2)) + 
                                 '; Dist_to_curr_goal:' + str(round(info['distance_to_currgoal'],2)) + 
                                 '; Current Goal:' + str(OBJECT_MAP[obs['multiobjectgoal'][0]]) + 
                                 '; Found_called:' + str(env.task.is_found_called) +
@@ -136,6 +137,8 @@ def evaluate_agent(config: Config) -> None:
             del metrics_info["top_down_map"]
         if "collisions" in metrics_info:
             del metrics_info["collisions"]
+        if "fow_map" in metrics_info:
+            del metrics_info["fow_map"]
         if "raw_metrics" in metrics_info:
             del metrics_info["raw_metrics"]
         

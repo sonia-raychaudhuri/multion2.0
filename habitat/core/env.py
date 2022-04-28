@@ -301,7 +301,7 @@ class Env:
         observations = self.task.reset(episode=self.current_episode)
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
             self.currMap = np.copy(self.mapCache[f"../multiON/{self.current_episode.scene_id}"])
-            self.task.occMap = self.currMap[:,:,0]
+            #self.task.occMap = self.currMap[:,:,0]
             self.task.sceneMap = self.currMap[:,:,0]
         self._task.measurements.reset_measures(
             episode=self.current_episode,

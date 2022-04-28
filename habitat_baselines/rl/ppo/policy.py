@@ -414,7 +414,7 @@ class BaselineNetOracle(Net):
         self.use_previous_action = use_previous_action
 
         self.visual_encoder = RGBCNNOracle(observation_space, 512)
-        if agent_type == "oracle":
+        if agent_type == "oracle" or (agent_type == "oracle-ego" and self.config.RL.MAPS.USE_OCC_IN_ORACLE_EGO):
             _n_input_map = 32
             self.occupancy_embedding = nn.Embedding(3, 16)
             self.object_embedding = nn.Embedding(9, 16)
@@ -477,13 +477,14 @@ class BaselineNetOracle(Net):
             global_map_embedding = []
             global_map = observations['semMap']
             
-            if self.agent_type == "oracle":
+            if self.agent_type == "oracle" or (agent_type == "oracle-ego" and self.config.RL.MAPS.USE_OCC_IN_ORACLE_EGO):
                 global_map_embedding.append(self.occupancy_embedding(global_map[:, :, :, 0].type(torch.LongTensor).to(self.device).view(-1)).view(bs, 50, 50 , -1))
                 
             if self.config.RL.MAPS.NEXT_GOAL_IND:
                 # Derive map with next goal from goal category and oracle map with goals and/or distractors
                 obj_cat_map = global_map[:,:,:,1]
-                goal_map = (obj_cat_map == ((target_encoding + 1).unsqueeze(1))).type(torch.LongTensor) # Adding one to match categories in oracle map
+                distrIndexOffset = 1 if self.agent_type == "oracle" else 2 # to match categories in oracle map
+                goal_map = (obj_cat_map == (target_encoding + distrIndexOffset).unsqueeze(1)).type(torch.LongTensor)
                 global_map_embedding.append(self.object_embedding(goal_map.to(self.device).view(-1)).view(bs, 50, 50, -1))
             else:
                 global_map_embedding.append(self.object_embedding(global_map[:, :, :, 1].type(torch.LongTensor).to(self.device).view(-1)).view(bs, 50, 50, -1))
