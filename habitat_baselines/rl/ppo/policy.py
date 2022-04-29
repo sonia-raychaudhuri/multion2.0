@@ -477,7 +477,7 @@ class BaselineNetOracle(Net):
             global_map_embedding = []
             global_map = observations['semMap']
             
-            if self.agent_type == "oracle" or (agent_type == "oracle-ego" and self.config.RL.MAPS.USE_OCC_IN_ORACLE_EGO):
+            if self.agent_type == "oracle" or (self.agent_type == "oracle-ego" and self.config.RL.MAPS.USE_OCC_IN_ORACLE_EGO):
                 global_map_embedding.append(self.occupancy_embedding(global_map[:, :, :, 0].type(torch.LongTensor).to(self.device).view(-1)).view(bs, 50, 50 , -1))
                 
             if self.config.RL.MAPS.NEXT_GOAL_IND:
