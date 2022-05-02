@@ -429,10 +429,10 @@ class BaselineNetOracle(Net):
         elif agent_type == "oracle-ego":
             _n_input_map = 16
             if self.config.RL.MAPS.USE_OCC_IN_ORACLE_EGO:
-                self.occupancy_embedding = nn.Embedding(3, 16)
+                self.occupancy_embedding = nn.Embedding(4, 16)
                 _n_input_map += 16
             self.map_encoder = MapCNN(50, 256, agent_type, _n_input_map)
-            self.object_embedding = nn.Embedding(12, 16)
+            self.object_embedding = nn.Embedding(10, 16)
             self.goal_embedding = nn.Embedding(9, object_category_embedding_size)
             
         
