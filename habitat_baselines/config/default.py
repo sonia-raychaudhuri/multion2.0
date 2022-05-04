@@ -26,6 +26,7 @@ _C.SIMULATOR_GPU_ID = 0
 _C.TORCH_GPU_ID = 0
 _C.VIDEO_OPTION = ["disk", "tensorboard"]
 _C.TENSORBOARD_DIR = "tb"
+_C.WRITER_TYPE = "tb"
 _C.VIDEO_DIR = "video_dir"
 _C.TEST_EPISODE_COUNT = 2
 _C.EVAL_CKPT_PATH_DIR = "data/checkpoints"  # path to ckpt or path to ckpts dir
@@ -35,6 +36,7 @@ _C.CHECKPOINT_FOLDER = "data/checkpoints"
 _C.NUM_UPDATES = 10000
 _C.LOG_INTERVAL = 10
 _C.LOG_FILE = "train.log"
+_C.NUM_CHECKPOINTS = -1
 _C.CHECKPOINT_INTERVAL = 50
 _C.TOTAL_NUM_STEPS = -1.0
 _C.FORCE_BLIND_POLICY = False
@@ -80,6 +82,7 @@ _C.RL.PPO.clip_param = 0.2
 _C.RL.PPO.ppo_epoch = 4
 _C.RL.PPO.num_mini_batch = 16
 _C.RL.PPO.value_loss_coef = 0.5
+_C.RL.PPO.obj_recog_loss_coef = 0.01
 _C.RL.PPO.entropy_coef = 0.01
 _C.RL.PPO.lr = 7e-4
 _C.RL.PPO.eps = 1e-5
@@ -98,6 +101,66 @@ _C.RL.PPO.hidden_size = 512
 # policy inference time during rollout generation
 # Not that this does not change the memory requirements
 _C.RL.PPO.use_double_buffered_sampler = False
+# -----------------------------------------------------------------------------
+# preemption CONFIG
+# -----------------------------------------------------------------------------
+_C.RL.preemption = CN()
+# Append the slurm job ID to the resume state filename if running a slurm job
+# This is useful when you want to have things from a different job but same
+# same checkpoint dir not resume.
+_C.RL.preemption.append_slurm_job_id = False
+# Number of gradient updates between saving the resume state
+_C.RL.preemption.save_resume_state_interval = 100
+# Save resume states only when running with slurm
+# This is nice if you don't want debug jobs to resume
+_C.RL.preemption.save_state_batch_only = False
+# -----------------------------------------------------------------------------
+# POLICY CONFIG
+# -----------------------------------------------------------------------------
+_C.RL.POLICY = CN()
+_C.RL.POLICY.name = "PointNavResNetPolicy"
+_C.RL.POLICY.action_distribution_type = "categorical"  # or 'gaussian'
+# If the list is empty, all keys will be included.
+_C.RL.POLICY.include_visual_keys = []
+_C.RL.GYM_OBS_KEYS = []
+# For gaussian action distribution:
+_C.RL.POLICY.ACTION_DIST = CN()
+_C.RL.POLICY.ACTION_DIST.use_log_std = True
+_C.RL.POLICY.ACTION_DIST.use_softplus = False
+# If True, the std will be a parameter not conditioned on state
+_C.RL.POLICY.ACTION_DIST.use_std_param = False
+# If True, the std will be clamped to the specified min and max std values
+_C.RL.POLICY.ACTION_DIST.clamp_std = True
+_C.RL.POLICY.ACTION_DIST.min_std = 1e-6
+_C.RL.POLICY.ACTION_DIST.max_std = 1
+_C.RL.POLICY.ACTION_DIST.min_log_std = -5
+_C.RL.POLICY.ACTION_DIST.max_log_std = 2
+# For continuous action distributions (including gaussian):
+_C.RL.POLICY.ACTION_DIST.action_activation = "tanh"  # ['tanh', '']
+# -----------------------------------------------------------------------------
+# OBS_TRANSFORMS CONFIG
+# -----------------------------------------------------------------------------
+_C.RL.POLICY.OBS_TRANSFORMS = CN()
+_C.RL.POLICY.OBS_TRANSFORMS.ENABLED_TRANSFORMS = tuple()
+_C.RL.POLICY.OBS_TRANSFORMS.CENTER_CROPPER = CN()
+_C.RL.POLICY.OBS_TRANSFORMS.CENTER_CROPPER.HEIGHT = 256
+_C.RL.POLICY.OBS_TRANSFORMS.CENTER_CROPPER.WIDTH = 256
+_C.RL.POLICY.OBS_TRANSFORMS.RESIZE_SHORTEST_EDGE = CN()
+_C.RL.POLICY.OBS_TRANSFORMS.RESIZE_SHORTEST_EDGE.SIZE = 256
+_C.RL.POLICY.OBS_TRANSFORMS.CUBE2EQ = CN()
+_C.RL.POLICY.OBS_TRANSFORMS.CUBE2EQ.HEIGHT = 256
+_C.RL.POLICY.OBS_TRANSFORMS.CUBE2EQ.WIDTH = 512
+_C.RL.POLICY.OBS_TRANSFORMS.CUBE2EQ.SENSOR_UUIDS = list()
+_C.RL.POLICY.OBS_TRANSFORMS.CUBE2FISH = CN()
+_C.RL.POLICY.OBS_TRANSFORMS.CUBE2FISH.HEIGHT = 256
+_C.RL.POLICY.OBS_TRANSFORMS.CUBE2FISH.WIDTH = 256
+_C.RL.POLICY.OBS_TRANSFORMS.CUBE2FISH.FOV = 180
+_C.RL.POLICY.OBS_TRANSFORMS.CUBE2FISH.PARAMS = (0.2, 0.2, 0.2)
+_C.RL.POLICY.OBS_TRANSFORMS.CUBE2FISH.SENSOR_UUIDS = list()
+_C.RL.POLICY.OBS_TRANSFORMS.EQ2CUBE = CN()
+_C.RL.POLICY.OBS_TRANSFORMS.EQ2CUBE.HEIGHT = 256
+_C.RL.POLICY.OBS_TRANSFORMS.EQ2CUBE.WIDTH = 256
+_C.RL.POLICY.OBS_TRANSFORMS.EQ2CUBE.SENSOR_UUIDS = list()
 # -----------------------------------------------------------------------------
 # MAPS
 # -----------------------------------------------------------------------------

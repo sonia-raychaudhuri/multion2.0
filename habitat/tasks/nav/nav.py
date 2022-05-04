@@ -634,7 +634,8 @@ class PercentageSuccess(Measure):
         is successful
     """
 
-    cls_uuid: str = "percentage_success"
+    #cls_uuid: str = "percentage_success"
+    cls_uuid: str = "progress"
 
     def __init__(
         self, *args: Any, sim: Simulator, config: Config, **kwargs: Any
@@ -730,7 +731,8 @@ class SPL(Measure):
 class MSPL(Measure):
     """SPL, but in multigoal case
     """
-    cls_uuid: str = "mspl"
+    #cls_uuid: str = "mspl"
+    cls_uuid: str = "spl"
 
     def __init__(
         self, sim: Simulator, config: Config, *args: Any, **kwargs: Any
@@ -793,7 +795,8 @@ class MSPL(Measure):
 class PSPL(Measure):
     """SPL, but in multigoal case
     """
-    cls_uuid: str = "pspl"
+    #cls_uuid: str = "pspl"
+    cls_uuid: str = "ppl"
 
     def __init__(
         self, sim: Simulator, config: Config, *args: Any, **kwargs: Any

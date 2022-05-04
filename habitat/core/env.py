@@ -27,6 +27,8 @@ from habitat.tasks import make_task
 from habitat.utils import profiling_wrapper
 import habitat_sim
 import magnum as mn
+from habitat.core.utils import try_cv2_import
+cv2 = try_cv2_import()
 
 # debug
 COORDINATE_EPSILON = 1e-6
@@ -148,6 +150,11 @@ class Env:
         if config.TRAINER_NAME == "oracle-ego":
             for x,y in self.mapCache.items():
                 self.mapCache[x] += 1
+        if config.TRAINER_NAME == "obj-recog":
+            with open(config.TASK.ORACLE_MAP_PATH, 'rb') as handle:
+                self.mapCache = pickle.load(handle)
+            self.objGraph = np.empty((300,300,3))
+            self.objGraph.fill(0)
 
     @property
     def current_episode(self) -> Episode:
@@ -299,7 +306,7 @@ class Env:
                 self._sim.set_object_motion_type(habitat_sim.physics.MotionType.STATIC, ind)
 
         observations = self.task.reset(episode=self.current_episode)
-        if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
+        if self._config.TRAINER_NAME in ["oracle", "oracle-ego", "obj-recog"]:
             self.currMap = np.copy(self.mapCache[f"../multiON/{self.current_episode.scene_id}"])
             #self.task.occMap = self.currMap[:,:,0]
             self.task.sceneMap = self.currMap[:,:,0]
@@ -346,11 +353,75 @@ class Env:
 
             patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40,:]
             patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False)
-            
             sem_map = patch[40-25:40+25, 40-25:40+25, :]
-            if sem_map.shape[0] == 0 or sem_map.shape[1] == 0:
-                sem_map = np.zeros((50,50,3))
+            if sem_map.shape[0] < 50 or sem_map.shape[1] < 50:
+                tmp = np.zeros((50,50,3))
+                tmp[:sem_map.shape[0], :sem_map.shape[1], :] = sem_map
+                sem_map = tmp
             observations["semMap"] = sem_map
+        elif self._config.TRAINER_NAME in ["obj-recog"]:
+            self.objGraph.fill(0)
+            channel_num = 1
+            # Adding goal information on the map
+            for i in range(len(self.current_episode.goals)):
+                loc0 = self.current_episode.goals[i].position[0]
+                loc2 = self.current_episode.goals[i].position[2]
+                grid_loc = self.conv_grid(loc0, loc2)
+                objIndexOffset = 1
+                self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, channel_num] = object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
+            
+                # Marking category of the goals
+                self.objGraph[grid_loc[0]-3:grid_loc[0]+4, grid_loc[1]-3:grid_loc[1]+4, 0] = object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
+                self.objGraph[grid_loc[0]-3:grid_loc[0]+4, grid_loc[1]-3:grid_loc[1]+4, 1] = loc0
+                self.objGraph[grid_loc[0]-3:grid_loc[0]+4, grid_loc[1]-3:grid_loc[1]+4, 2] = loc2
+                
+            if self._config["TASK"]["INCLUDE_DISTRACTORS"]:
+                if self._config["TASK"]["ORACLE_MAP_INCLUDE_DISTRACTORS_W_GOAL"]:
+                    channel_num = 1
+                else:
+                    channel_num = 2
+                
+                # Adding distractor information on the map
+                distrIndexOffset = 1
+                num_distr = self._config["TASK"]["NUM_DISTRACTORS"] if self._config["TASK"]["NUM_DISTRACTORS"] > 0 else len(self.current_episode.distractors)
+                for i in range(num_distr):
+                    loc0 = self.current_episode.distractors[i].position[0]
+                    loc2 = self.current_episode.distractors[i].position[2]
+                    grid_loc = self.conv_grid(loc0, loc2)
+                    self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, channel_num] = object_to_datset_mapping[self.current_episode.distractors[i].object_category] + distrIndexOffset
+
+            currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+            if self.currMap[currPix[0], currPix[1], 2] == 0:
+                self.currMap[currPix[0], currPix[1], 2] = 1
+            else:
+                self.currMap[currPix[0], currPix[1], 2] = 2
+                
+            patch = self.currMap
+            patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40,:]
+            patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False, mode="nearest")
+            sem_map = patch[40-25:40+25, 40-25:40+25, :]
+            if sem_map.shape[0] < 50 or sem_map.shape[1] < 50:
+                tmp = np.zeros((50,50,3))
+                tmp[:sem_map.shape[0], :sem_map.shape[1], :] = sem_map
+                sem_map = tmp
+            observations["semMap"] = sem_map
+            
+            # code for object category
+            if self.objGraph[currPix[0], currPix[1], 0] != 0:
+                vector = np.array([self.objGraph[currPix[0], currPix[1], 1], self.objGraph[currPix[0], currPix[1], 2]]) - \
+                    np.array([observations["agent_position"][0], observations["agent_position"][2]])
+                goalToAgentHeading = np.arctan2(-vector[0], -vector[1]) * 180 / np.pi
+                includedAng = np.absolute((observations["heading"][0] * 180/np.pi) - goalToAgentHeading)
+                if includedAng > 180.0:
+                    includedAng = 360.0 -180.0
+                assert includedAng >= 0
+                assert includedAng <= 180.0
+                if includedAng < 40.0: 
+                    observations["objectCat"] = self.objGraph[currPix[0], currPix[1], 0]
+                else:
+                    observations["objectCat"] = 0
+            else:
+                observations["objectCat"] = 0
             
         return observations
 
@@ -420,9 +491,46 @@ class Env:
             
             patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False)
             sem_map = patch[40-25:40+25, 40-25:40+25, :]
-            if sem_map.shape[0] == 0 or sem_map.shape[1] == 0:
-                sem_map = np.zeros((50,50,3))
+            if sem_map.shape[0] < 50 or sem_map.shape[1] < 50:
+                tmp = np.zeros((50,50,3))
+                tmp[:sem_map.shape[0], :sem_map.shape[1], :] = sem_map
+                sem_map = tmp
             observations["semMap"] = sem_map
+        
+        elif self._config.TRAINER_NAME in ["obj-recog"]:
+            currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+            if self.currMap[currPix[0], currPix[1], 2] == 0:
+                self.currMap[currPix[0], currPix[1], 2] = 1
+            else:
+                self.currMap[currPix[0], currPix[1], 2] = 2
+                
+            patch = self.currMap
+            patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40,:]
+            
+            patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False)
+            sem_map = patch[40-25:40+25, 40-25:40+25, :]
+            if sem_map.shape[0] < 50 or sem_map.shape[1] < 50:
+                tmp = np.zeros((50,50,3))
+                tmp[:sem_map.shape[0], :sem_map.shape[1], :] = sem_map
+                sem_map = tmp
+            observations["semMap"] = sem_map
+            
+            # code for objectCat
+            if self.objGraph[currPix[0], currPix[1], 0] != 0:
+                vector = np.array([self.objGraph[currPix[0], currPix[1], 1], self.objGraph[currPix[0], currPix[1], 2]]) - \
+                    np.array([observations["agent_position"][0], observations["agent_position"][2]])
+                goalToAgentHeading = np.arctan2(-vector[0], -vector[1]) * 180 / np.pi
+                includedAng = np.absolute((observations["heading"][0] * 180/np.pi) - goalToAgentHeading)
+                if includedAng > 180.0:
+                    includedAng = 360.0 -180.0
+                assert includedAng >= 0
+                assert includedAng <= 180.0
+                if includedAng < 40.0: 
+                    observations["objectCat"] = self.objGraph[currPix[0], currPix[1], 0]
+                else:
+                    observations["objectCat"] = 0
+            else:
+                observations["objectCat"] = 0
             
         ##Terminates episode if wrong found is called
         if self.task.is_found_called == True and \

@@ -79,6 +79,11 @@ def run_exp(exp_config: str, run_type: str, agent_type: str, opts=None) -> None:
         if agent_type == "oracle-ego":
             config.TASK_CONFIG.TASK.MEASUREMENTS.append('FOW_MAP')
         config.freeze()
+    elif agent_type in ["obj-recog"]:
+        trainer_init = baseline_registry.get_trainer("obj-recog")
+        config.defrost()
+        config.RL.PPO.hidden_size = 512
+        config.freeze()
     else:
         trainer_init = baseline_registry.get_trainer("non-oracle")
         config.defrost()
