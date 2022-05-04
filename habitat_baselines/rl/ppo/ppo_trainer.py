@@ -97,6 +97,9 @@ class PPOTrainer(BaseRLTrainer):
         self.agent = None
         self.envs = None
         self.obs_transforms = []
+        
+        if 'NUM_ENVIRONMENTS' not in self.config:
+            self.config.NUM_ENVIRONMENTS = self.config.NUM_PROCESSES
 
         self._static_encoder = False
         self._encoder = None
@@ -983,7 +986,7 @@ class PPOTrainer(BaseRLTrainer):
 
         test_recurrent_hidden_states = torch.zeros(
             self.config.NUM_ENVIRONMENTS,
-            self.actor_critic.num_recurrent_layers,
+            self.actor_critic.net.num_recurrent_layers,
             ppo_cfg.hidden_size,
             device=self.device,
         )
@@ -1792,7 +1795,7 @@ class PPOTrainerObjectRecog(PPOTrainer):
 
         test_recurrent_hidden_states = torch.zeros(
             self.config.NUM_ENVIRONMENTS,
-            self.actor_critic.num_recurrent_layers,
+            self.actor_critic.net.num_recurrent_layers,
             ppo_cfg.hidden_size,
             device=self.device,
         )
@@ -4140,7 +4143,7 @@ class PPOTrainerOracleMap(PPOTrainer):
 
         test_recurrent_hidden_states = torch.zeros(
             self.config.NUM_ENVIRONMENTS,
-            self.actor_critic.num_recurrent_layers,
+            self.actor_critic.net.num_recurrent_layers,
             ppo_cfg.hidden_size,
             device=self.device,
         )

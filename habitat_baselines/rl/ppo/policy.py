@@ -29,6 +29,10 @@ class PolicyObjectRecog(nn.Module):
         )
         self.critic = CriticHead(self.net.output_size)
 
+    @property
+    def should_load_agent_state(self):
+        return True
+
     def forward(self, *x):
         raise NotImplementedError
 
@@ -148,6 +152,10 @@ class PolicyOracle(nn.Module):
             self.net.output_size, self.dim_actions
         )
         self.critic = CriticHead(self.net.output_size)
+
+    @property
+    def should_load_agent_state(self):
+        return True
 
     def forward(self, *x):
         raise NotImplementedError

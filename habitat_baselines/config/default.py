@@ -31,6 +31,7 @@ _C.VIDEO_DIR = "video_dir"
 _C.TEST_EPISODE_COUNT = 2
 _C.EVAL_CKPT_PATH_DIR = "data/checkpoints"  # path to ckpt or path to ckpts dir
 _C.NUM_PROCESSES = 16
+_C.NUM_ENVIRONMENTS = 16
 _C.SENSORS = ["RGB_SENSOR", "DEPTH_SENSOR"]
 _C.CHECKPOINT_FOLDER = "data/checkpoints"
 _C.NUM_UPDATES = 10000
@@ -59,6 +60,7 @@ _C.EVAL = CN()
 _C.EVAL.SPLIT = "val"
 _C.EVAL.USE_CKPT_CONFIG = True
 _C.EVAL.EVAL_NONLEARNING = False
+_C.EVAL.SHOULD_LOAD_CKPT = True
 # -----------------------------------------------------------------------------
 # REINFORCEMENT LEARNING (RL) ENVIRONMENT CONFIG
 # -----------------------------------------------------------------------------
