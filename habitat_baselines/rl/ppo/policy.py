@@ -141,6 +141,68 @@ class PolicyNonOracle(nn.Module):
 
         return value, action_log_probs, distribution_entropy, rnn_hidden_states
 
+class PolicyProjObjectRecog(nn.Module):
+    def __init__(self, net, dim_actions):
+        super().__init__()
+        self.net = net
+        self.dim_actions = dim_actions
+
+        self.action_distribution = CategoricalNet(
+            self.net.output_size, self.dim_actions
+        )
+        self.critic = CriticHead(self.net.output_size)
+
+    def forward(self, *x):
+        raise NotImplementedError
+
+    def act(
+        self,
+        observations,
+        rnn_hidden_states,
+        global_map,
+        prev_actions,
+        masks,
+        deterministic=False,
+    ):
+        features, rnn_hidden_states, global_map, _ = self.net(
+            observations, rnn_hidden_states, global_map, prev_actions, masks
+        )
+
+        distribution = self.action_distribution(features)
+        value = self.critic(features)
+
+        if deterministic:
+            action = distribution.mode()
+        else:
+            action = distribution.sample()
+
+        action_log_probs = distribution.log_probs(action)
+
+        return value, action, action_log_probs, rnn_hidden_states, global_map
+
+    def get_value(self, observations, rnn_hidden_states, global_map, prev_actions, masks):
+        features, _, _, _ = self.net(
+            observations, rnn_hidden_states, global_map, prev_actions, masks
+        )
+        return self.critic(features)
+
+    def evaluate_actions(
+        self, observations, rnn_hidden_states, global_map, prev_actions, masks, action
+    ):
+        features, rnn_hidden_states, global_map, obj_prob = self.net(
+            observations, rnn_hidden_states, global_map, prev_actions, masks, ev=1
+        )
+        distribution = self.action_distribution(features)
+        value = self.critic(features)
+
+        action_log_probs = distribution.log_probs(action)
+        distribution_entropy = distribution.entropy().mean()
+
+        loss = nn.CrossEntropyLoss()
+        obj_recog_loss = loss(obj_prob, observations['objectCat'].long())
+        
+        return value, action_log_probs, distribution_entropy, rnn_hidden_states, obj_recog_loss
+
 
 class PolicyOracle(nn.Module):
     def __init__(self, net, dim_actions):
@@ -278,6 +340,35 @@ class BaselinePolicyNonOracle(PolicyNonOracle):
                 global_map_depth=global_map_depth,
                 coordinate_min=coordinate_min,
                 coordinate_max=coordinate_max,
+            ),
+            action_space.n,
+        )
+
+class BaselinePolicyProjObjectRecog(PolicyProjObjectRecog):
+    def __init__(
+        self,
+        batch_size,
+        observation_space,
+        action_space,
+        goal_sensor_uuid,
+        device,
+        object_category_embedding_size,
+        previous_action_embedding_size,
+        use_previous_action,
+        config,
+        hidden_size=512,
+    ):
+        super().__init__(
+            BaselineNetProjObjectRecog(
+                batch_size,
+                observation_space=observation_space,
+                hidden_size=hidden_size,
+                goal_sensor_uuid=goal_sensor_uuid,
+                device=device,
+                object_category_embedding_size=object_category_embedding_size,
+                previous_action_embedding_size=previous_action_embedding_size,
+                use_previous_action=use_previous_action,
+                config=config,
             ),
             action_space.n,
         )
@@ -513,6 +604,175 @@ class BaselineNetNonOracle(Net):
             x = torch.cat((perception_embed, global_map_embed, goal_embed, action_embedding), dim = 1)
             x, rnn_hidden_states = self.state_encoder(x, rnn_hidden_states, masks)
             return x, rnn_hidden_states, final_retrieval.permute(0, 2, 3, 1) 
+
+class BaselineNetProjObjectRecog(Net):
+    r"""Network which passes the input image through CNN and concatenates
+    goal vector with CNN's output and passes that through RNN.
+    """
+
+    def __init__(self, batch_size, observation_space, hidden_size, goal_sensor_uuid, device, 
+        object_category_embedding_size, previous_action_embedding_size, use_previous_action, config
+    ):
+        super().__init__()
+        self.goal_sensor_uuid = goal_sensor_uuid
+        self._n_input_goal = observation_space.spaces[
+            self.goal_sensor_uuid
+        ].shape[0]
+        self._hidden_size = hidden_size
+        self.device = device
+        self.use_previous_action = use_previous_action
+        self.config = config
+        self.egocentric_map_size = self.config.RL.MAPS.egocentric_map_size
+        self.global_map_size = self.config.RL.MAPS.global_map_size
+        self.global_map_depth = self.config.RL.MAPS.global_map_depth
+        self.coordinate_max = self.config.RL.MAPS.coordinate_max
+        self.coordinate_min = self.config.RL.MAPS.coordinate_min
+        self.local_map_size = self.config.RL.MAPS.local_map_size
+
+        self.visual_encoder = RGBCNNNonOracle(observation_space, hidden_size)
+        self.map_encoder = MapCNN(self.local_map_size, 256, "non-oracle")        
+
+        self.projection = Projection(self.egocentric_map_size, self.global_map_size, 
+            device, self.coordinate_min, self.coordinate_max
+        )
+
+        self.to_grid = to_grid(self.global_map_size, self.coordinate_min, self.coordinate_max)
+        self.rotate_tensor = RotateTensor(device)
+
+        self.image_features_linear = nn.Linear(self.global_map_depth * 28 * 28, 512)
+
+        self.flatten = Flatten()
+
+        if self.use_previous_action:
+            self.state_encoder = RNNStateEncoder(
+                self._hidden_size + 256 + object_category_embedding_size + 
+                previous_action_embedding_size, self._hidden_size,
+            )
+        else:
+            self.state_encoder = RNNStateEncoder(
+                (0 if self.is_blind else self._hidden_size) + object_category_embedding_size,
+                self._hidden_size,   #Replace 2 by number of target categories later
+            )
+        self.goal_embedding = nn.Embedding(8, object_category_embedding_size)
+        self.action_embedding = nn.Embedding(4, previous_action_embedding_size)
+        self.full_global_map = torch.zeros(
+            batch_size,
+            self.global_map_size,
+            self.global_map_size,
+            self.global_map_depth,
+            device=self.device,
+        )
+        
+        # Object Category Prediction
+        self.obj_linear = nn.Linear(512, 10) # Number of object categories + 1
+        nn.init.orthogonal_(self.obj_linear.weight, gain=0.01)
+        nn.init.constant_(self.obj_linear.bias, 0)
+
+        self.train()
+
+    @property
+    def output_size(self):
+        return self._hidden_size
+
+    @property
+    def is_blind(self):
+        return self.visual_encoder.is_blind
+
+    @property
+    def num_recurrent_layers(self):
+        return self.state_encoder.num_recurrent_layers
+
+    def get_target_encoding(self, observations):
+        return observations[self.goal_sensor_uuid]
+
+    def forward(self, observations, rnn_hidden_states, global_map, prev_actions, masks, ev=0):
+        target_encoding = self.get_target_encoding(observations)
+        goal_embed = self.goal_embedding((target_encoding).type(torch.LongTensor).to(self.device)).squeeze(1)
+        
+        if not self.is_blind:
+            perception_embed_feats = self.visual_encoder(observations)
+        # interpolated_perception_embed = F.interpolate(perception_embed_feats, scale_factor=256./28., mode='bilinear')
+        projection = self.projection.forward(perception_embed_feats, observations['depth'] * 10, -(observations["compass"]))
+        perception_embed = self.image_features_linear(self.flatten(perception_embed_feats))
+        grid_x, grid_y = self.to_grid.get_grid_coords(observations['gps'])
+        # grid_x_coord, grid_y_coord = grid_x.type(torch.uint8), grid_y.type(torch.uint8)
+        bs = global_map.shape[0]
+        ##forward pass specific
+        if ev == 0:
+            self.full_global_map[:bs, :, :, :] = self.full_global_map[:bs, :, :, :] * masks.unsqueeze(1).unsqueeze(1)
+            if bs != 18:
+                self.full_global_map[bs:, :, :, :] = self.full_global_map[bs:, :, :, :] * 0
+            if torch.cuda.is_available():
+                with torch.cuda.device(self.device):
+                    agent_view = torch.cuda.FloatTensor(bs, self.global_map_depth, self.global_map_size, self.global_map_size).fill_(0)
+            else:
+                agent_view = torch.FloatTensor(bs, self.global_map_depth, self.global_map_size, self.global_map_size).to(self.device).fill_(0)
+            agent_view[:, :, 
+                self.global_map_size//2 - math.floor(self.egocentric_map_size/2):self.global_map_size//2 + math.ceil(self.egocentric_map_size/2), 
+                self.global_map_size//2 - math.floor(self.egocentric_map_size/2):self.global_map_size//2 + math.ceil(self.egocentric_map_size/2)
+            ] = projection
+            st_pose = torch.cat(
+                [-(grid_y.unsqueeze(1)-(self.global_map_size//2))/(self.global_map_size//2),
+                 -(grid_x.unsqueeze(1)-(self.global_map_size//2))/(self.global_map_size//2), 
+                 observations['compass']], 
+                 dim=1
+            )
+            rot_mat, trans_mat = get_grid(st_pose, agent_view.size(), self.device)
+            rotated = F.grid_sample(agent_view, rot_mat)
+            translated = F.grid_sample(rotated, trans_mat)
+            self.full_global_map[:bs, :, :, :] = torch.max(self.full_global_map[:bs, :, :, :], translated.permute(0, 2, 3, 1))
+            st_pose_retrieval = torch.cat(
+                [
+                    (grid_y.unsqueeze(1)-(self.global_map_size//2))/(self.global_map_size//2),
+                    (grid_x.unsqueeze(1)-(self.global_map_size//2))/(self.global_map_size//2),
+                    torch.zeros_like(observations['compass'])
+                    ],
+                    dim=1
+                )
+            _, trans_mat_retrieval = get_grid(st_pose_retrieval, agent_view.size(), self.device)
+            translated_retrieval = F.grid_sample(self.full_global_map[:bs, :, :, :].permute(0, 3, 1, 2), trans_mat_retrieval)
+            translated_retrieval = translated_retrieval[:,:,
+                self.global_map_size//2-math.floor(self.local_map_size/2):self.global_map_size//2+math.ceil(self.local_map_size/2), 
+                self.global_map_size//2-math.floor(self.local_map_size/2):self.global_map_size//2+math.ceil(self.local_map_size/2)
+            ]
+            final_retrieval = self.rotate_tensor.forward(translated_retrieval, observations["compass"])
+
+            global_map_embed = self.map_encoder(final_retrieval.permute(0, 2, 3, 1))
+
+            if self.use_previous_action:
+                action_embedding = self.action_embedding(prev_actions).squeeze(1)
+
+            x = torch.cat((perception_embed, global_map_embed, goal_embed, action_embedding), dim = 1)
+            x, rnn_hidden_states = self.state_encoder(x, rnn_hidden_states.permute(1, 0, 2), masks)
+            
+            # Object category prediction
+            obj_prob = self.obj_linear(perception_embed)
+            
+            return x, rnn_hidden_states.permute(1, 0, 2), final_retrieval.permute(0, 2, 3, 1), obj_prob
+        else: 
+            global_map = global_map * masks.unsqueeze(1).unsqueeze(1)  ##verify
+            with torch.cuda.device(self.device):
+                agent_view = torch.cuda.FloatTensor(bs, self.global_map_depth, self.local_map_size, self.local_map_size).fill_(0)
+            agent_view[:, :, 
+                self.local_map_size//2 - math.floor(self.egocentric_map_size/2):self.local_map_size//2 + math.ceil(self.egocentric_map_size/2), 
+                self.local_map_size//2 - math.floor(self.egocentric_map_size/2):self.local_map_size//2 + math.ceil(self.egocentric_map_size/2)
+            ] = projection
+            
+            final_retrieval = torch.max(global_map, agent_view.permute(0, 2, 3, 1))
+
+            global_map_embed = self.map_encoder(final_retrieval)
+
+            if self.use_previous_action:
+                action_embedding = self.action_embedding(prev_actions).squeeze(1)
+
+            x = torch.cat((perception_embed, global_map_embed, goal_embed, action_embedding), dim = 1)
+            x, rnn_hidden_states = self.state_encoder(x, rnn_hidden_states.permute(1, 0, 2), masks)
+            
+            # Object category prediction
+            obj_prob = self.obj_linear(perception_embed)
+            
+            return x, rnn_hidden_states.permute(1, 0, 2), final_retrieval.permute(0, 2, 3, 1), obj_prob 
+            
             
 
 class BaselineNetOracle(Net):
@@ -829,7 +1089,6 @@ class BaselineNetObjectRecog(Net):
         obj_prob = self.obj_linear(perception_embed)
 
         return x, rnn_hidden_states.permute(1, 0, 2), obj_prob
-
 
 class Policy(nn.Module, metaclass=abc.ABCMeta):
     def __init__(self, net, dim_actions, policy_config=None):

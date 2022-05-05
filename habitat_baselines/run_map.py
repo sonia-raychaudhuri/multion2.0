@@ -32,9 +32,9 @@ def main():
 
     parser.add_argument(
         "--agent-type",
-        choices=["no-map", "oracle", "oracle-ego", "proj-neural", "obj-recog"],
+        choices=["no-map", "oracle", "oracle-ego", "proj-neural", "obj-recog", "proj-obj-recog"],
         required=True,
-        help="agent type: oracle, oracleego, projneural, objrecog",
+        help="agent type: oracle, oracleego, projneural, objrecog, proj-obj-recog",
     )
 
     parser.add_argument(
@@ -81,6 +81,11 @@ def run_exp(exp_config: str, run_type: str, agent_type: str, opts=None) -> None:
         config.freeze()
     elif agent_type in ["obj-recog"]:
         trainer_init = baseline_registry.get_trainer("obj-recog")
+        config.defrost()
+        config.RL.PPO.hidden_size = 512
+        config.freeze()
+    elif agent_type in ["proj-obj-recog"]:
+        trainer_init = baseline_registry.get_trainer("proj-obj-recog")
         config.defrost()
         config.RL.PPO.hidden_size = 512
         config.freeze()

@@ -155,6 +155,9 @@ class Env:
                 self.mapCache = pickle.load(handle)
             self.objGraph = np.empty((300,300,3))
             self.objGraph.fill(0)
+        if config.TRAINER_NAME == "proj-obj-recog":
+            self.objGraph = np.empty((300,300,3))
+            self.objGraph.fill(0)
 
     @property
     def current_episode(self) -> Episode:
@@ -422,6 +425,38 @@ class Env:
                     observations["objectCat"] = 0
             else:
                 observations["objectCat"] = 0
+        elif self._config.TRAINER_NAME in ["proj-obj-recog"]:
+            self.objGraph.fill(0)
+            channel_num = 1
+            # Adding goal information on the map
+            for i in range(len(self.current_episode.goals)):
+                loc0 = self.current_episode.goals[i].position[0]
+                loc2 = self.current_episode.goals[i].position[2]
+                grid_loc = self.conv_grid(loc0, loc2)
+                objIndexOffset = 1
+                # Marking category of the goals
+                self.objGraph[grid_loc[0]-3:grid_loc[0]+4, grid_loc[1]-3:grid_loc[1]+4, 0] = object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
+                self.objGraph[grid_loc[0]-3:grid_loc[0]+4, grid_loc[1]-3:grid_loc[1]+4, 1] = loc0
+                self.objGraph[grid_loc[0]-3:grid_loc[0]+4, grid_loc[1]-3:grid_loc[1]+4, 2] = loc2
+                
+            currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+            
+            # code for object category
+            if self.objGraph[currPix[0], currPix[1], 0] != 0:
+                vector = np.array([self.objGraph[currPix[0], currPix[1], 1], self.objGraph[currPix[0], currPix[1], 2]]) - \
+                    np.array([observations["agent_position"][0], observations["agent_position"][2]])
+                goalToAgentHeading = np.arctan2(-vector[0], -vector[1]) * 180 / np.pi
+                includedAng = np.absolute((observations["heading"][0] * 180/np.pi) - goalToAgentHeading)
+                if includedAng > 180.0:
+                    includedAng = 360.0 -180.0
+                assert includedAng >= 0
+                assert includedAng <= 180.0
+                if includedAng < 40.0: 
+                    observations["objectCat"] = self.objGraph[currPix[0], currPix[1], 0]
+                else:
+                    observations["objectCat"] = 0
+            else:
+                observations["objectCat"] = 0
             
         return observations
 
@@ -516,6 +551,25 @@ class Env:
             observations["semMap"] = sem_map
             
             # code for objectCat
+            if self.objGraph[currPix[0], currPix[1], 0] != 0:
+                vector = np.array([self.objGraph[currPix[0], currPix[1], 1], self.objGraph[currPix[0], currPix[1], 2]]) - \
+                    np.array([observations["agent_position"][0], observations["agent_position"][2]])
+                goalToAgentHeading = np.arctan2(-vector[0], -vector[1]) * 180 / np.pi
+                includedAng = np.absolute((observations["heading"][0] * 180/np.pi) - goalToAgentHeading)
+                if includedAng > 180.0:
+                    includedAng = 360.0 -180.0
+                assert includedAng >= 0
+                assert includedAng <= 180.0
+                if includedAng < 40.0: 
+                    observations["objectCat"] = self.objGraph[currPix[0], currPix[1], 0]
+                else:
+                    observations["objectCat"] = 0
+            else:
+                observations["objectCat"] = 0
+        elif self._config.TRAINER_NAME in ["proj-obj-recog"]:
+            currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+            
+            # code for object category
             if self.objGraph[currPix[0], currPix[1], 0] != 0:
                 vector = np.array([self.objGraph[currPix[0], currPix[1], 1], self.objGraph[currPix[0], currPix[1], 2]]) - \
                     np.array([observations["agent_position"][0], observations["agent_position"][2]])

@@ -623,6 +623,7 @@ class BaseRLTrainer(BaseTrainer):
         prev_actions: Tensor,
         batch: Dict[str, Tensor],
         rgb_frames: Union[List[List[Any]], List[List[ndarray]]],
+        test_global_map: None
     ) -> Tuple[
         Union[VectorEnv, RLEnv, Env],
         Tensor,
@@ -631,6 +632,7 @@ class BaseRLTrainer(BaseTrainer):
         Tensor,
         Dict[str, Tensor],
         List[List[Any]],
+        Tensor,
     ]:
         # pausing self.envs with no new episode
         if len(envs_to_pause) > 0:
@@ -647,6 +649,11 @@ class BaseRLTrainer(BaseTrainer):
             current_episode_reward = current_episode_reward[state_index]
             prev_actions = prev_actions[state_index]
 
+            if test_global_map is not None:
+                test_global_map = test_global_map[
+                    state_index, :
+                ]
+            
             for k, v in batch.items():
                 batch[k] = v[state_index]
 
@@ -660,4 +667,5 @@ class BaseRLTrainer(BaseTrainer):
             prev_actions,
             batch,
             rgb_frames,
+            test_global_map
         )

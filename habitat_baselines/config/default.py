@@ -170,12 +170,14 @@ _C.RL.MAPS = CN()
 _C.RL.MAPS.egocentric_map_size = 3
 _C.RL.MAPS.global_map_size = 250
 _C.RL.MAPS.global_map_depth = 32
+_C.RL.MAPS.local_map_size= 51
 COORDINATE_EPSILON = 1e-6
 _C.RL.MAPS.coordinate_min = -62.3241 - COORDINATE_EPSILON
 _C.RL.MAPS.coordinate_max = 90.0399 + COORDINATE_EPSILON
 _C.RL.MAPS.INCLUDE_DISTRACTOR_EMBED = False
 _C.RL.MAPS.NEXT_GOAL_IND = False
 _C.RL.MAPS.USE_OCC_IN_ORACLE_EGO = False
+_C.RL.MAPS.USE_ORACLE_IN_OBJ_RECOG = False
 # -----------------------------------------------------------------------------
 # DECENTRALIZED DISTRIBUTED PROXIMAL POLICY OPTIMIZATION (DD-PPO)
 # -----------------------------------------------------------------------------
