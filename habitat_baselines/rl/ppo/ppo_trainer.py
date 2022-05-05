@@ -1183,6 +1183,13 @@ class PPOTrainer(BaseRLTrainer):
         for k, v in metrics.items():
             writer.add_scalar(f"eval_metrics/{k}", v, step_id)
 
+        ##Dump metrics JSON
+        if not os.path.exists(config.TENSORBOARD_DIR_EVAL +'/metrics'):
+            os.mkdir(config.TENSORBOARD_DIR_EVAL +'/metrics')
+        
+        with open(config.TENSORBOARD_DIR_EVAL +'/metrics/' + checkpoint_path.split('/')[-1] + '_overall.json', 'w') as fp:
+            json.dump(aggregated_stats, fp)
+
         self.envs.close()
 
 @baseline_registry.register_trainer(name="obj-recog")
@@ -1993,6 +2000,13 @@ class PPOTrainerObjectRecog(PPOTrainer):
         metrics = {k: v for k, v in aggregated_stats.items() if k != "reward"}
         for k, v in metrics.items():
             writer.add_scalar(f"eval_metrics/{k}", v, step_id)
+
+        ##Dump metrics JSON
+        if not os.path.exists(config.TENSORBOARD_DIR_EVAL +'/metrics'):
+            os.mkdir(config.TENSORBOARD_DIR_EVAL +'/metrics')
+        
+        with open(config.TENSORBOARD_DIR_EVAL +'/metrics/' + checkpoint_path.split('/')[-1] + '_overall.json', 'w') as fp:
+            json.dump(aggregated_stats, fp)
 
         self.envs.close()
 
@@ -2883,6 +2897,13 @@ class PPOTrainerProjObjectRecog(PPOTrainer):
         metrics = {k: v for k, v in aggregated_stats.items() if k != "reward"}
         for k, v in metrics.items():
             writer.add_scalar(f"eval_metrics/{k}", v, step_id)
+
+        ##Dump metrics JSON
+        if not os.path.exists(config.TENSORBOARD_DIR_EVAL +'/metrics'):
+            os.mkdir(config.TENSORBOARD_DIR_EVAL +'/metrics')
+        
+        with open(config.TENSORBOARD_DIR_EVAL +'/metrics/' + checkpoint_path.split('/')[-1] + '_overall.json', 'w') as fp:
+            json.dump(aggregated_stats, fp)
 
         self.envs.close()
 
@@ -5057,6 +5078,7 @@ class PPOTrainerOracleMap(PPOTrainer):
         stats_episodes: Dict[
             Any, Any
         ] = {}  # dict of dicts that stores stats per episode
+        raw_metrics_episodes = dict()
 
         rgb_frames = [
             [] for _ in range(self.config.NUM_ENVIRONMENTS)
@@ -5163,6 +5185,12 @@ class PPOTrainerOracleMap(PPOTrainer):
                         )
                     ] = episode_stats
 
+                    if 'RAW_METRICS' in config.TASK_CONFIG.TASK.MEASUREMENTS:
+                        raw_metrics_episodes[
+                            current_episodes[i].scene_id + '.' + 
+                            current_episodes[i].episode_id
+                        ] = infos[i]["raw_metrics"]
+
                     if len(self.config.VIDEO_OPTION) > 0:
                         generate_video(
                             video_option=self.config.VIDEO_OPTION,
@@ -5232,5 +5260,16 @@ class PPOTrainerOracleMap(PPOTrainer):
         metrics = {k: v for k, v in aggregated_stats.items() if k != "reward"}
         for k, v in metrics.items():
             writer.add_scalar(f"eval_metrics/{k}", v, step_id)
+
+        ##Dump metrics JSON
+        if not os.path.exists(config.TENSORBOARD_DIR_EVAL +'/metrics'):
+            os.mkdir(config.TENSORBOARD_DIR_EVAL +'/metrics')
+        
+        with open(config.TENSORBOARD_DIR_EVAL +'/metrics/' + checkpoint_path.split('/')[-1] + '_overall.json', 'w') as fp:
+            json.dump(aggregated_stats, fp)
+        
+        if 'RAW_METRICS' in config.TASK_CONFIG.TASK.MEASUREMENTS:
+            with open(config.TENSORBOARD_DIR_EVAL +'/metrics/' + checkpoint_path.split('/')[-1] + '.json', 'w') as fp:
+                json.dump(raw_metrics_episodes, fp)
 
         self.envs.close()
