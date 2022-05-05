@@ -283,7 +283,7 @@ class CriticHead(nn.Module):
 class BaselinePolicyObjectRecog(PolicyObjectRecog):
     def __init__(
         self,
-     
+        batch_size,
         observation_space,
         action_space,
         goal_sensor_uuid,
