@@ -4,18 +4,18 @@ ENV_NAME: "NavRLEnv"
 SIMULATOR_GPU_ID: 0
 TORCH_GPU_ID: 0
 VIDEO_OPTION: []
-TENSORBOARD_DIR: "experiments/1ON2.0/oracle_map/train"
-TENSORBOARD_DIR_EVAL: "experiments/1ON2.0/oracle_map/eval"
-VIDEO_DIR: "experiments/1ON2.0/oracle_map/eval/videos"
+TENSORBOARD_DIR: "experiments/3ON2.0/profiling/train"
+TENSORBOARD_DIR_EVAL: "experiments/3ON2.0/profiling/eval"
+VIDEO_DIR: "experiments/3ON2.0/profiling/eval/videos"
 TEST_EPISODE_COUNT: 10
-EVAL_CKPT_PATH_DIR: "experiments/1ON2.0/oracle_map/checkpoints"
+EVAL_CKPT_PATH_DIR: "experiments/3ON2.0/profiling/checkpoints"
 NUM_PROCESSES: 12
 NUM_ENVIRONMENTS: 12
 SENSORS: ["RGB_SENSOR", "DEPTH_SENSOR"]
-CHECKPOINT_FOLDER: "experiments/1ON2.0/oracle_map/checkpoints"
-NUM_UPDATES: 5   #300000
+CHECKPOINT_FOLDER: "experiments/3ON2.0/profiling/checkpoints"
+NUM_UPDATES: 5 #300000
 LOG_INTERVAL: 1
-CHECKPOINT_INTERVAL: 500
+CHECKPOINT_INTERVAL: 10
 
 # EVAL:
 #   SPLIT: "test"
@@ -51,5 +51,5 @@ RL:
     egocentric_map_size: 13 # 3 x 3
     global_map_size: 275
     global_map_depth: 32
-    coordinate_min: -62.3241
-    coordinate_max: 90.0399
+    coordinate_min: -110.0
+    coordinate_max:  110.0
