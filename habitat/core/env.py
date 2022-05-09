@@ -15,7 +15,7 @@ from gym import spaces
 from scipy import ndimage
 import math
 import torch
-import torch.nn.functional as F
+import torchvision.transforms.functional as TF
 
 from habitat.config import Config
 from habitat.core.dataset import Dataset, Episode, EpisodeIterator
@@ -27,8 +27,7 @@ from habitat.tasks import make_task
 from habitat.utils import profiling_wrapper
 import habitat_sim
 import magnum as mn
-from habitat.core.utils import try_cv2_import
-cv2 = try_cv2_import()
+from habitat.utils.visualizations import maps
 
 # debug
 COORDINATE_EPSILON = 1e-6
@@ -142,11 +141,12 @@ class Env:
         self._episode_start_time: Optional[float] = None
         self._episode_over = False
         self._map_resolution = 300
-        self.meters_per_pixel = 0.1
+        self.meters_per_pixel = 0.8
         self.cropped_map_size = 80
         if config.TRAINER_NAME in ["oracle", "oracle-ego"]:
-            with open(config.TASK.ORACLE_MAP_PATH, 'rb') as handle:
-                self.mapCache = pickle.load(handle)
+            self.mapCache = {}
+            """ with open(config.TASK.ORACLE_MAP_PATH, 'rb') as handle:
+                self.mapCache = pickle.load(handle) """
         if config.TRAINER_NAME == "oracle-ego":
             for x,y in self.mapCache.items():
                 self.mapCache[x] += 1
@@ -310,9 +310,39 @@ class Env:
 
         observations = self.task.reset(episode=self.current_episode)
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego", "obj-recog"]:
-            self.currMap = np.copy(self.mapCache[f"../multiON/{self.current_episode.scene_id}"])
+            #self.currMap = np.copy(self.mapCache[f"../multiON/{self.current_episode.scene_id}"])
+            agent_vertical_pos = str(round(observations["agent_position"][1],2))
+            if (self.current_episode.scene_id in self.mapCache and 
+                    agent_vertical_pos in self.mapCache[self.current_episode.scene_id]):
+                self.currMap = self.mapCache[self.current_episode.scene_id][agent_vertical_pos]
+            else:
+                top_down_map = maps.get_topdown_map_from_sim(
+                    self._sim,
+                    draw_border=False,
+                    meters_per_pixel=self.meters_per_pixel
+                )
+                range_x = np.where(np.any(top_down_map, axis=1))[0]
+                range_y = np.where(np.any(top_down_map, axis=0))[0]
+                padding = int(np.ceil(top_down_map.shape[0] / 400))
+                range_x = (
+                    max(range_x[0] - padding, 0),
+                    min(range_x[-1] + padding + 1, top_down_map.shape[0]),
+                )
+                range_y = (
+                    max(range_y[0] - padding, 0),
+                    min(range_y[-1] + padding + 1, top_down_map.shape[1]),
+                )
+                top_down_map[range_x[0] : range_x[1], range_y[0] : range_y[1]] += 1
+                self.currMap = np.zeros((top_down_map.shape[0],top_down_map.shape[1],3))
+                self.currMap[:top_down_map.shape[0], :top_down_map.shape[1], 0] = top_down_map
+                
+                if self.current_episode.scene_id not in self.mapCache:
+                    self.mapCache[self.current_episode.scene_id] = {}
+                self.mapCache[self.current_episode.scene_id][agent_vertical_pos] = self.currMap
+            
             #self.task.occMap = self.currMap[:,:,0]
             self.task.sceneMap = self.currMap[:,:,0]
+        
         self._task.measurements.reset_measures(
             episode=self.current_episode,
             task=self.task,
@@ -325,7 +355,13 @@ class Env:
             for i in range(len(self.current_episode.goals)):
                 loc0 = self.current_episode.goals[i].position[0]
                 loc2 = self.current_episode.goals[i].position[2]
-                grid_loc = self.conv_grid(loc0, loc2)
+                #grid_loc = self.conv_grid(loc0, loc2)
+                grid_loc = maps.to_grid(
+                    loc2,
+                    loc0,
+                    self.currMap.shape[0:2],
+                    sim=self._sim,
+                )
                 objIndexOffset = 1 if self._config.TRAINER_NAME == "oracle" else 2
                 self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, channel_num] = object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
                 
@@ -341,26 +377,52 @@ class Env:
                 for i in range(num_distr):
                     loc0 = self.current_episode.distractors[i].position[0]
                     loc2 = self.current_episode.distractors[i].position[2]
-                    grid_loc = self.conv_grid(loc0, loc2)
+                    #grid_loc = self.conv_grid(loc0, loc2)
+                    grid_loc = maps.to_grid(
+                        loc2,
+                        loc0,
+                        self.currMap.shape[0:2],
+                        sim=self._sim,
+                    )
                     self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, channel_num] = object_to_datset_mapping[self.current_episode.distractors[i].object_category] + distrIndexOffset
 
-            currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+            #currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+            currPix = maps.to_grid(
+                    observations["agent_position"][2],
+                    observations["agent_position"][0],
+                    self.currMap.shape[0:2],
+                    sim=self._sim,
+                )
             
             if self._config.TRAINER_NAME == "oracle-ego":
                 self.expose = np.repeat(
                     self.task.measurements.measures["fow_map"].get_metric()[:, :, np.newaxis], 3, axis = 2
                 )
-                patch = self.currMap * self.expose
+                patch_tmp = self.currMap * self.expose
             elif self._config.TRAINER_NAME == "oracle":
-                patch = self.currMap
+                patch_tmp = self.currMap
+            
+            patch = patch_tmp[max(currPix[0]-40,0):currPix[0]+40, max(currPix[1]-40,0):currPix[1]+40,:]
+            if patch.shape[0] < 80 or patch.shape[1] < 80:
+                if currPix[0] < 40:
+                    curr_x = currPix[0]
+                else:
+                    curr_x = 40
+                if currPix[1] < 40:
+                    curr_y = currPix[1]
+                else:
+                    curr_y = 40
+                    
+                map_mid = (80//2)
+                tmp = np.zeros((80, 80,3))
+                tmp[map_mid-curr_x:map_mid-curr_x+patch.shape[0],
+                        map_mid-curr_y:map_mid-curr_y+patch.shape[1], :] = patch
+                patch = tmp
+                
+            patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, axes=(0,1), order=0, reshape=False)
+            #patch = TF.rotate(torch.tensor(patch).permute(2,0,1), -(observations["heading"][0] * 180/np.pi) + 90).permute(1,2,0).numpy()
 
-            patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40,:]
-            patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False)
             sem_map = patch[40-25:40+25, 40-25:40+25, :]
-            if sem_map.shape[0] < 50 or sem_map.shape[1] < 50:
-                tmp = np.zeros((50,50,3))
-                tmp[:sem_map.shape[0], :sem_map.shape[1], :] = sem_map
-                sem_map = tmp
             observations["semMap"] = sem_map
         elif self._config.TRAINER_NAME in ["obj-recog"]:
             self.objGraph.fill(0)
@@ -369,7 +431,13 @@ class Env:
             for i in range(len(self.current_episode.goals)):
                 loc0 = self.current_episode.goals[i].position[0]
                 loc2 = self.current_episode.goals[i].position[2]
-                grid_loc = self.conv_grid(loc0, loc2)
+                #grid_loc = self.conv_grid(loc0, loc2)
+                grid_loc = maps.to_grid(
+                    loc2,
+                    loc0,
+                    self.currMap.shape[0:2],
+                    sim=self._sim,
+                )
                 objIndexOffset = 1
                 self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, channel_num] = object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
             
@@ -390,23 +458,49 @@ class Env:
                 for i in range(num_distr):
                     loc0 = self.current_episode.distractors[i].position[0]
                     loc2 = self.current_episode.distractors[i].position[2]
-                    grid_loc = self.conv_grid(loc0, loc2)
+                    #grid_loc = self.conv_grid(loc0, loc2)
+                    grid_loc = maps.to_grid(
+                        loc2,
+                        loc0,
+                        self.currMap.shape[0:2],
+                        sim=self._sim,
+                    )
                     self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, channel_num] = object_to_datset_mapping[self.current_episode.distractors[i].object_category] + distrIndexOffset
 
-            currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+            #currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+            currPix = maps.to_grid(
+                    observations["agent_position"][2],
+                    observations["agent_position"][0],
+                    self.currMap.shape[0:2],
+                    sim=self._sim,
+                )
             if self.currMap[currPix[0], currPix[1], 2] == 0:
                 self.currMap[currPix[0], currPix[1], 2] = 1
             else:
                 self.currMap[currPix[0], currPix[1], 2] = 2
                 
             patch = self.currMap
-            patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40,:]
-            patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False, mode="nearest")
+            patch = patch_tmp[max(currPix[0]-40,0):currPix[0]+40, max(currPix[1]-40,0):currPix[1]+40,:]
+            if patch.shape[0] < 80 or patch.shape[1] < 80:
+                if currPix[0] < 40:
+                    curr_x = currPix[0]
+                else:
+                    curr_x = 40
+                if currPix[1] < 40:
+                    curr_y = currPix[1]
+                else:
+                    curr_y = 40
+                    
+                map_mid = (80//2)
+                tmp = np.zeros((80, 80,3))
+                tmp[map_mid-curr_x:map_mid-curr_x+patch.shape[0],
+                        map_mid-curr_y:map_mid-curr_y+patch.shape[1], :] = patch
+                patch = tmp
+                
+            patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, axes=(0,1), order=0, reshape=False)
+            #patch = TF.rotate(torch.tensor(patch).permute(2,0,1), -(observations["heading"][0] * 180/np.pi) + 90).permute(1,2,0).numpy()
+            
             sem_map = patch[40-25:40+25, 40-25:40+25, :]
-            if sem_map.shape[0] < 50 or sem_map.shape[1] < 50:
-                tmp = np.zeros((50,50,3))
-                tmp[:sem_map.shape[0], :sem_map.shape[1], :] = sem_map
-                sem_map = tmp
             observations["semMap"] = sem_map
             
             # code for object category
@@ -432,14 +526,26 @@ class Env:
             for i in range(len(self.current_episode.goals)):
                 loc0 = self.current_episode.goals[i].position[0]
                 loc2 = self.current_episode.goals[i].position[2]
-                grid_loc = self.conv_grid(loc0, loc2)
+                #grid_loc = self.conv_grid(loc0, loc2)
+                grid_loc = maps.to_grid(
+                    loc2,
+                    loc0,
+                    self.currMap.shape[0:2],
+                    sim=self._sim,
+                )
                 objIndexOffset = 1
                 # Marking category of the goals
                 self.objGraph[grid_loc[0]-3:grid_loc[0]+4, grid_loc[1]-3:grid_loc[1]+4, 0] = object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
                 self.objGraph[grid_loc[0]-3:grid_loc[0]+4, grid_loc[1]-3:grid_loc[1]+4, 1] = loc0
                 self.objGraph[grid_loc[0]-3:grid_loc[0]+4, grid_loc[1]-3:grid_loc[1]+4, 2] = loc2
                 
-            currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+            #currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+            currPix = maps.to_grid(
+                    observations["agent_position"][2],
+                    observations["agent_position"][0],
+                    self.currMap.shape[0:2],
+                    sim=self._sim,
+                )
             
             # code for object category
             if self.objGraph[currPix[0], currPix[1], 0] != 0:
@@ -512,42 +618,80 @@ class Env:
         )
 
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
-            currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+            #currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+            currPix = maps.to_grid(
+                    observations["agent_position"][2],
+                    observations["agent_position"][0],
+                    self.currMap.shape[0:2],
+                    sim=self._sim,
+                )
             
             if self._config.TRAINER_NAME == "oracle-ego":
                 self.expose = np.repeat(
                     self.task.measurements.measures["fow_map"].get_metric()[:, :, np.newaxis], 3, axis = 2
                 )
-                patch = self.currMap * self.expose
+                patch_tmp = self.currMap * self.expose
             elif self._config.TRAINER_NAME == "oracle":
-                patch = self.currMap
+                patch_tmp = self.currMap
 
-            patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40,:]
+            patch = patch_tmp[max(currPix[0]-40,0):currPix[0]+40, max(currPix[1]-40,0):currPix[1]+40,:]
+            if patch.shape[0] < 80 or patch.shape[1] < 80:
+                if currPix[0] < 40:
+                    curr_x = currPix[0]
+                else:
+                    curr_x = 40
+                if currPix[1] < 40:
+                    curr_y = currPix[1]
+                else:
+                    curr_y = 40
+                    
+                map_mid = (80//2)
+                tmp = np.zeros((80, 80,3))
+                tmp[map_mid-curr_x:map_mid-curr_x+patch.shape[0],
+                        map_mid-curr_y:map_mid-curr_y+patch.shape[1], :] = patch
+                patch = tmp
             
-            patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False)
+            patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, axes=(0,1), order=0, reshape=False)
+            #patch = TF.rotate(torch.tensor(patch).permute(2,0,1), -(observations["heading"][0] * 180/np.pi) + 90).permute(1,2,0).numpy()
+            
             sem_map = patch[40-25:40+25, 40-25:40+25, :]
-            if sem_map.shape[0] < 50 or sem_map.shape[1] < 50:
-                tmp = np.zeros((50,50,3))
-                tmp[:sem_map.shape[0], :sem_map.shape[1], :] = sem_map
-                sem_map = tmp
             observations["semMap"] = sem_map
         
         elif self._config.TRAINER_NAME in ["obj-recog"]:
-            currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+            #currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+            currPix = maps.to_grid(
+                    observations["agent_position"][2],
+                    observations["agent_position"][0],
+                    self.currMap.shape[0:2],
+                    sim=self._sim,
+                )
             if self.currMap[currPix[0], currPix[1], 2] == 0:
                 self.currMap[currPix[0], currPix[1], 2] = 1
             else:
                 self.currMap[currPix[0], currPix[1], 2] = 2
                 
             patch = self.currMap
-            patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40,:]
+            patch = patch_tmp[max(currPix[0]-40,0):currPix[0]+40, max(currPix[1]-40,0):currPix[1]+40,:]
+            if patch.shape[0] < 80 or patch.shape[1] < 80:
+                if currPix[0] < 40:
+                    curr_x = currPix[0]
+                else:
+                    curr_x = 40
+                if currPix[1] < 40:
+                    curr_y = currPix[1]
+                else:
+                    curr_y = 40
+                    
+                map_mid = (80//2)
+                tmp = np.zeros((80, 80,3))
+                tmp[map_mid-curr_x:map_mid-curr_x+patch.shape[0],
+                        map_mid-curr_y:map_mid-curr_y+patch.shape[1], :] = patch
+                patch = tmp
+                
+            patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, axes=(0,1), order=0, reshape=False)
+            #patch = TF.rotate(torch.tensor(patch).permute(2,0,1), -(observations["heading"][0] * 180/np.pi) + 90).permute(1,2,0).numpy()
             
-            patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False)
             sem_map = patch[40-25:40+25, 40-25:40+25, :]
-            if sem_map.shape[0] < 50 or sem_map.shape[1] < 50:
-                tmp = np.zeros((50,50,3))
-                tmp[:sem_map.shape[0], :sem_map.shape[1], :] = sem_map
-                sem_map = tmp
             observations["semMap"] = sem_map
             
             # code for objectCat
@@ -567,7 +711,13 @@ class Env:
             else:
                 observations["objectCat"] = 0
         elif self._config.TRAINER_NAME in ["proj-obj-recog"]:
-            currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+            #currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+            currPix = maps.to_grid(
+                    observations["agent_position"][2],
+                    observations["agent_position"][0],
+                    self.currMap.shape[0:2],
+                    sim=self._sim,
+                )
             
             # code for object category
             if self.objGraph[currPix[0], currPix[1], 0] != 0:

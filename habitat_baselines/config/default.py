@@ -28,6 +28,9 @@ _C.VIDEO_OPTION = ["disk", "tensorboard"]
 _C.TENSORBOARD_DIR = "tb"
 _C.WRITER_TYPE = "tb"
 _C.VIDEO_DIR = "video_dir"
+_C.VIDEO_FPS = 10
+_C.VIDEO_RENDER_TOP_DOWN = True
+_C.VIDEO_RENDER_ALL_INFO = False
 _C.TEST_EPISODE_COUNT = 2
 _C.EVAL_CKPT_PATH_DIR = "data/checkpoints"  # path to ckpt or path to ckpts dir
 _C.NUM_PROCESSES = 16
@@ -42,6 +45,7 @@ _C.CHECKPOINT_INTERVAL = 50
 _C.TOTAL_NUM_STEPS = -1.0
 _C.FORCE_BLIND_POLICY = False
 _C.VERBOSE = True
+_C.EVAL_KEYS_TO_INCLUDE_IN_NAME = []
 # For our use case, the CPU side things are mainly memory copies
 # and nothing of substantive compute. PyTorch has been making
 # more and more memory copies parallel, but that just ends up

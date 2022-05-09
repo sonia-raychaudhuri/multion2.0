@@ -1105,6 +1105,26 @@ class TopDownMap(Measure):
                     except AttributeError:
                         pass
 
+    def _draw_goals_and_distractors(self, episode):
+        for goal in episode.goals:
+            if self._is_on_same_floor(goal.position[1]):
+                try:
+                    color_ind = maps.MULTION_OBJECT_CATEGORY[goal.object_category]
+                    self._draw_point(
+                        goal.position, (maps.MULTION_TOP_DOWN_MAP_START + color_ind)
+                    )
+                except AttributeError:
+                    pass
+        for distractor in episode.distractors:
+            if self._is_on_same_floor(distractor.position[1]):
+                try:
+                    color_ind = maps.MULTION_OBJECT_CATEGORY[distractor.object_category]
+                    self._draw_point(
+                        distractor.position, (maps.MULTION_TOP_DOWN_MAP_START + color_ind)
+                    )
+                except AttributeError:
+                    pass
+
     def _draw_goals_aabb(self, episode):
         if self._config.DRAW_GOAL_AABBS:
             for goal in episode.goals:
@@ -1198,9 +1218,10 @@ class TopDownMap(Measure):
         self.update_fog_of_war_mask(np.array([a_x, a_y]))
 
         # draw source and target parts last to avoid overlap
-        self._draw_goals_view_points(episode)
-        self._draw_goals_aabb(episode)
-        self._draw_goals_positions(episode)
+        #self._draw_goals_view_points(episode)
+        #self._draw_goals_aabb(episode)
+        #self._draw_goals_positions(episode)
+        self._draw_goals_and_distractors(episode)
 
         #self._draw_shortest_path(episode, agent_position)
 

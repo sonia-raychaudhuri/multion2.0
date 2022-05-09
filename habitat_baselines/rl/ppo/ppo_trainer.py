@@ -1133,7 +1133,7 @@ class PPOTrainer(BaseRLTrainer):
                 elif len(self.config.VIDEO_OPTION) > 0:
                     # TODO move normalization / channel changing out of the policy and undo it here
                     frame = observations_to_image(
-                        {k: v[i] for k, v in batch.items()}, infos[i]
+                        {k: v[i] for k, v in batch.items()}, info=infos[i]
                     )
                     if self.config.VIDEO_RENDER_ALL_INFO:
                         frame = overlay_frame(frame, infos[i])
@@ -1950,7 +1950,7 @@ class PPOTrainerObjectRecog(PPOTrainer):
                 elif len(self.config.VIDEO_OPTION) > 0:
                     # TODO move normalization / channel changing out of the policy and undo it here
                     frame = observations_to_image(
-                        {k: v[i] for k, v in batch.items()}, infos[i]
+                        {k: v[i] for k, v in batch.items()}, info=infos[i]
                     )
                     if self.config.VIDEO_RENDER_ALL_INFO:
                         frame = overlay_frame(frame, infos[i])
@@ -1976,6 +1976,7 @@ class PPOTrainerObjectRecog(PPOTrainer):
                 prev_actions,
                 batch,
                 rgb_frames,
+                None
             )
 
         num_episodes = len(stats_episodes)
@@ -2846,7 +2847,7 @@ class PPOTrainerProjObjectRecog(PPOTrainer):
                 elif len(self.config.VIDEO_OPTION) > 0:
                     # TODO move normalization / channel changing out of the policy and undo it here
                     frame = observations_to_image(
-                        {k: v[i] for k, v in batch.items()}, infos[i]
+                        {k: v[i] for k, v in batch.items()}, info=infos[i]
                     )
                     if self.config.VIDEO_RENDER_ALL_INFO:
                         frame = overlay_frame(frame, infos[i])
@@ -5210,7 +5211,7 @@ class PPOTrainerOracleMap(PPOTrainer):
                 elif len(self.config.VIDEO_OPTION) > 0:
                     # TODO move normalization / channel changing out of the policy and undo it here
                     frame = observations_to_image(
-                        {k: v[i] for k, v in batch.items()}, infos[i]
+                        {k: v[i] for k, v in batch.items()}, info=infos[i]
                     )
                     if self.config.VIDEO_RENDER_ALL_INFO:
                         frame = overlay_frame(frame, infos[i])
@@ -5236,6 +5237,7 @@ class PPOTrainerOracleMap(PPOTrainer):
                 prev_actions,
                 batch,
                 rgb_frames,
+                None
             )
 
         num_episodes = len(stats_episodes)

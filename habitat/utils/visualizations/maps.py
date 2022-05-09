@@ -53,6 +53,17 @@ TOP_DOWN_MAP_COLORS[MAP_SHORTEST_PATH_COLOR] = [0, 200, 0]  # Green
 TOP_DOWN_MAP_COLORS[MAP_VIEW_POINT_INDICATOR] = [245, 150, 150]  # Light Red
 TOP_DOWN_MAP_COLORS[MAP_TARGET_BOUNDING_BOX] = [0, 175, 0]  # Green
 
+# Multion Objects
+MULTION_OBJECT_CATEGORY = {'cylinder_red':0, 'cylinder_green':1, 'cylinder_blue':2, 'cylinder_yellow':3, 
+                            'cylinder_white':4, 'cylinder_pink':5, 'cylinder_black':6, 'cylinder_cyan':7}
+MULTION_TOP_DOWN_MAP_START = 20
+TOP_DOWN_MAP_COLORS[MULTION_TOP_DOWN_MAP_START-1] = [150, 150, 150]
+TOP_DOWN_MAP_COLORS[MULTION_TOP_DOWN_MAP_START:MULTION_TOP_DOWN_MAP_START+8] = np.array(
+    [[200, 0, 0], [0, 200, 0], [0, 0, 200], 
+    [255, 255, 0], [250, 250, 250], [250, 45, 185], 
+    [0, 0, 0], [0,255,255]], 
+    dtype=np.uint8
+)
 
 def draw_agent(
     image: np.ndarray,
