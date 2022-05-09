@@ -141,7 +141,7 @@ class Env:
         self._episode_start_time: Optional[float] = None
         self._episode_over = False
         self._map_resolution = 300
-        self.meters_per_pixel = 0.8
+        self.meters_per_pixel = self._config.TASK["MAP_RESOLUTION"] if "MAP_RESOLUTION" in self._config.TASK else 0.8
         self.cropped_map_size = 80
         if config.TRAINER_NAME in ["oracle", "oracle-ego"]:
             self.mapCache = {}
