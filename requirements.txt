@@ -6,3 +6,4 @@ attr==0.3.1
 einops==0.2.0
 tensorboard
 torch_scatter==2.0.3
+jsonlines
