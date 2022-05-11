@@ -306,6 +306,7 @@ def get_topdown_map(
     map_resolution: int = 1024,
     draw_border: bool = True,
     meters_per_pixel: Optional[float] = None,
+    with_sampling: Optional[bool] = True
 ) -> np.ndarray:
     r"""Return a top-down occupancy map for a sim. Note, this only returns valid
     values for whatever floor the agent is currently on.
@@ -325,9 +326,15 @@ def get_topdown_map(
             map_resolution, pathfinder=pathfinder
         )
 
-    top_down_map = pathfinder.get_topdown_view(
-        meters_per_pixel=meters_per_pixel, height=height
-    ).astype(np.uint8)
+    if with_sampling:
+        top_down_map = pathfinder.get_topdown_view_with_sampling(
+            meters_per_pixel=meters_per_pixel, height=height,
+            num_samples=1000, nav_threshold=0.3
+        ).astype(np.uint8)
+    else:
+        top_down_map = pathfinder.get_topdown_view(
+            meters_per_pixel=meters_per_pixel, height=height
+        ).astype(np.uint8)
 
     # Draw border if necessary
     if draw_border:
@@ -342,6 +349,7 @@ def get_topdown_map_from_sim(
     draw_border: bool = True,
     meters_per_pixel: Optional[float] = None,
     agent_id: int = 0,
+    with_sampling: Optional[bool] = True
 ) -> np.ndarray:
     r"""Wrapper around :py:`get_topdown_map` that retrieves that pathfinder and heigh from the current simulator
 
@@ -354,6 +362,7 @@ def get_topdown_map_from_sim(
         map_resolution,
         draw_border,
         meters_per_pixel,
+        with_sampling
     )
 
 

@@ -319,7 +319,8 @@ class Env:
                 top_down_map = maps.get_topdown_map_from_sim(
                     self._sim,
                     draw_border=False,
-                    meters_per_pixel=self.meters_per_pixel
+                    meters_per_pixel=self.meters_per_pixel,
+                    with_sampling=True
                 )
                 range_x = np.where(np.any(top_down_map, axis=1))[0]
                 range_y = np.where(np.any(top_down_map, axis=0))[0]
