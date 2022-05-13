@@ -21,7 +21,7 @@ class Challenge(Benchmark):
             logger.info("{}: {}".format(k, v))
         
         print("Progress:", metrics["progress"])
-        print("PPL:", metrics["multiON_ppl"])
-        print("Success:", metrics["multiON_success"])
-        print("SPL:", metrics["multiON_spl"])
+        print("PPL:", metrics["ppl"])
+        print("Success:", metrics["success"])
+        print("SPL:", metrics["spl"])
 

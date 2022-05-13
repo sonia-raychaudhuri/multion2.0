@@ -1056,6 +1056,7 @@ class TopDownMap(Measure):
             self._sim,
             map_resolution=self._map_resolution,
             draw_border=self._config.DRAW_BORDER,
+            with_sampling=False
         )
 
         if self._config.FOG_OF_WAR.DRAW:
