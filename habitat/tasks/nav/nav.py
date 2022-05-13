@@ -795,7 +795,6 @@ class MSPL(Measure):
 class PSPL(Measure):
     """SPL, but in multigoal case
     """
-    #cls_uuid: str = "pspl"
     cls_uuid: str = "ppl"
 
     def __init__(
@@ -1437,81 +1436,6 @@ class DistanceToGoal(Measure):
         self._previous_position = current_position
 
         self._metric = distance_to_target
-
-
-@registry.register_measure
-class PSPL(Measure):
-    """SPL, but in multigoal case
-    """
-    cls_uuid: str = "pspl"
-
-    def __init__(
-        self, sim: Simulator, config: Config, *args: Any, **kwargs: Any
-    ):
-        self._previous_position = None
-        self._start_end_episode_distance = None
-        self._agent_episode_distance = None
-        self._sim = sim
-        self._config = config
-        self._episode_view_points = None
-        super().__init__(**kwargs)
-
-
-    def _get_uuid(self, *args: Any, **kwargs: Any):
-        return self.cls_uuid
-
-    def reset_metric(self, *args: Any, episode, task, **kwargs: Any):
-        self._previous_position = self._sim.get_agent_state().position.tolist()
-
-        self._start_end_episode_distance = 0
-        self._start_subgoal_episode_distance = []
-        self._start_subgoal_agent_distance = []
-        for goal_number in range(len(episode.goals) ):  # Find distances between successive goals and keep adding them
-            if goal_number == 0:
-                self._start_end_episode_distance += self._sim.geodesic_distance(
-                    episode.start_position, episode.goals[0].position
-                )
-                self._start_subgoal_episode_distance.append(self._start_end_episode_distance)
-            else:
-                self._start_end_episode_distance += self._sim.geodesic_distance(
-                    episode.goals[goal_number - 1].position, episode.goals[goal_number].position
-                )
-                self._start_subgoal_episode_distance.append(self._start_end_episode_distance)
-        self._agent_episode_distance = 0.0
-        self._metric = None
-        task.measurements.check_measure_dependencies(
-            self.uuid, [SubSuccess.cls_uuid, PercentageSuccess.cls_uuid]
-        )
-        self.update_metric(*args, episode=episode, task=task, **kwargs)
-        ##
-
-    def _euclidean_distance(self, position_a, position_b):
-        return np.linalg.norm(
-            np.array(position_b) - np.array(position_a), ord=2
-        )
-
-    def update_metric(self, *args: Any, episode, task: EmbodiedTask, **kwargs: Any):
-        current_position = self._sim.get_agent_state().position.tolist()
-        ep_percentage_success = task.measurements.measures[PercentageSuccess.cls_uuid].get_metric()
-        ep_sub_success = task.measurements.measures[SubSuccess.cls_uuid].get_metric()
-
-        self._agent_episode_distance += self._euclidean_distance(
-            current_position, self._previous_position
-        )
-        self._previous_position = current_position
-
-        if ep_sub_success:
-            self._start_subgoal_agent_distance.append(self._agent_episode_distance)
-
-        if ep_percentage_success > 0:
-            self._metric = ep_percentage_success * (
-                self._start_subgoal_episode_distance[task.current_goal_index - 1]
-                / max(
-                    self._start_subgoal_agent_distance[-1], self._start_subgoal_episode_distance[task.current_goal_index - 1]
-                )
-            )
-        else:
-            self._metric = 0
 
 @registry.register_measure
 class DistanceToMultiGoal(Measure):
