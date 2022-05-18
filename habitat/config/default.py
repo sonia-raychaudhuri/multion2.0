@@ -147,6 +147,15 @@ _C.TASK.PROXIMITY_SENSOR = CN()
 _C.TASK.PROXIMITY_SENSOR.TYPE = "ProximitySensor"
 _C.TASK.PROXIMITY_SENSOR.MAX_DETECTION_RADIUS = 2.0
 # -----------------------------------------------------------------------------
+# SEMANTIC MAP SENSOR
+# -----------------------------------------------------------------------------
+_C.TASK.SEMANTIC_MAP_SENSOR = CN()
+_C.TASK.SEMANTIC_MAP_SENSOR.TYPE = "SemanticMapSensor"
+_C.TASK.SEMANTIC_MAP_SENSOR.METERS_PER_PIXEL = 0.5
+_C.TASK.SEMANTIC_MAP_SENSOR.EGOCENTRIC_MAP_SIZE = 51
+_C.TASK.SEMANTIC_MAP_SENSOR.CROPPED_MAP_SIZE = 80
+_C.TASK.SEMANTIC_MAP_SENSOR.MAP_CHANNELS = 3
+# -----------------------------------------------------------------------------
 # SUCCESS MEASUREMENT
 # -----------------------------------------------------------------------------
 _C.TASK.SUCCESS = CN()

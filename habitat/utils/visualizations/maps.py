@@ -54,7 +54,7 @@ TOP_DOWN_MAP_COLORS[MAP_VIEW_POINT_INDICATOR] = [245, 150, 150]  # Light Red
 TOP_DOWN_MAP_COLORS[MAP_TARGET_BOUNDING_BOX] = [0, 175, 0]  # Green
 
 # Multion Objects
-MULTION_OBJECT_CATEGORY = {'cylinder_red':0, 'cylinder_green':1, 'cylinder_blue':2, 'cylinder_yellow':3, 
+MULTION_CYL_OBJECT_CATEGORY = {'cylinder_red':0, 'cylinder_green':1, 'cylinder_blue':2, 'cylinder_yellow':3, 
                             'cylinder_white':4, 'cylinder_pink':5, 'cylinder_black':6, 'cylinder_cyan':7}
 MULTION_TOP_DOWN_MAP_START = 20
 TOP_DOWN_MAP_COLORS[MULTION_TOP_DOWN_MAP_START-1] = [150, 150, 150]
@@ -351,7 +351,9 @@ def get_topdown_map_from_sim(
     draw_border: bool = True,
     meters_per_pixel: Optional[float] = None,
     agent_id: int = 0,
-    with_sampling: Optional[bool] = True
+    with_sampling: Optional[bool] = True,
+    num_samples: Optional[float] = 1000,
+    nav_threshold: Optional[float] = 0.3,
 ) -> np.ndarray:
     r"""Wrapper around :py:`get_topdown_map` that retrieves that pathfinder and heigh from the current simulator
 
@@ -364,7 +366,9 @@ def get_topdown_map_from_sim(
         map_resolution,
         draw_border,
         meters_per_pixel,
-        with_sampling
+        with_sampling,
+        num_samples,
+        nav_threshold
     )
 
 

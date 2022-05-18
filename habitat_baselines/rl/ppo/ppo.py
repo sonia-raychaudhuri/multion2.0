@@ -183,7 +183,7 @@ class PPOObjectRecog(nn.Module):
         pass
 
 
-class PPOProjObjectRecog(nn.Module):
+class PPOSemantic(nn.Module):
     def __init__(
         self,
         actor_critic,
@@ -192,7 +192,7 @@ class PPOProjObjectRecog(nn.Module):
         num_mini_batch,
         value_loss_coef,
         entropy_coef,
-        obj_recog_loss_coef,
+        semantic_map_loss_coef,
         lr=None,
         eps=None,
         max_grad_norm=None,
@@ -210,7 +210,7 @@ class PPOProjObjectRecog(nn.Module):
 
         self.value_loss_coef = value_loss_coef
         self.entropy_coef = entropy_coef
-        self.obj_recog_loss_coef = obj_recog_loss_coef
+        self.semantic_map_loss_coef = semantic_map_loss_coef
 
         self.max_grad_norm = max_grad_norm
         self.use_clipped_value_loss = use_clipped_value_loss
@@ -242,7 +242,7 @@ class PPOProjObjectRecog(nn.Module):
         value_loss_epoch = 0.0
         action_loss_epoch = 0.0
         dist_entropy_epoch = 0.0
-        objec_recog_loss_epoch = 0.0
+        semantic_map_loss_epoch = 0.0
 
         for _e in range(self.ppo_epoch):
             profiling_wrapper.range_push("PPO.update epoch")
@@ -256,7 +256,7 @@ class PPOProjObjectRecog(nn.Module):
                     action_log_probs,
                     dist_entropy,
                     _,
-                    obj_recog_loss,
+                    semantic_map_loss,
                 ) = self._evaluate_actions(
                     batch["observations"],
                     batch["recurrent_hidden_states"],
@@ -298,7 +298,7 @@ class PPOProjObjectRecog(nn.Module):
                     value_loss * self.value_loss_coef
                     + action_loss
                     - dist_entropy * self.entropy_coef
-                    + obj_recog_loss * self.obj_recog_loss_coef
+                    + semantic_map_loss * self.semantic_map_loss_coef
                 )
 
                 self.before_backward(total_loss)
@@ -312,7 +312,7 @@ class PPOProjObjectRecog(nn.Module):
                 value_loss_epoch += value_loss.item()
                 action_loss_epoch += action_loss.item()
                 dist_entropy_epoch += dist_entropy.item()
-                objec_recog_loss_epoch += obj_recog_loss.item()
+                semantic_map_loss_epoch += semantic_map_loss.item()
 
             profiling_wrapper.range_pop()  # PPO.update epoch
 
@@ -321,9 +321,9 @@ class PPOProjObjectRecog(nn.Module):
         value_loss_epoch /= num_updates
         action_loss_epoch /= num_updates
         dist_entropy_epoch /= num_updates
-        objec_recog_loss_epoch /= num_updates
+        semantic_map_loss_epoch /= num_updates
 
-        return value_loss_epoch, action_loss_epoch, dist_entropy_epoch, objec_recog_loss_epoch
+        return value_loss_epoch, action_loss_epoch, dist_entropy_epoch, semantic_map_loss_epoch
 
     def _evaluate_actions(
         self, observations, rnn_hidden_states, global_map, prev_actions, masks, action

@@ -552,3 +552,116 @@ class SimpleCNN(nn.Module):
         cnn_input = torch.cat(cnn_input, dim=1)
 
         return self.cnn(cnn_input)
+
+
+
+class SemanticMapCNN(nn.Module):
+    r"""A Simple 3-Conv CNN
+
+    Takes in observations and produces an embedding of the semantic map
+
+    Args:
+        observation_space: The observation_space of the agent
+        output_size: The size of the embedding vector
+    """
+
+    def __init__(self, map_size, input_channels=32, num_classes=10):
+        super().__init__()
+       
+        self.input_channels = input_channels
+        self.num_classes = num_classes
+
+        # kernel size for different CNN layers
+        self._cnn_layers_kernel_size = [(7, 7), (3, 3), (3, 3)]
+        # strides for different CNN layers
+        self._cnn_layers_stride = [(1, 1), (1, 1), (1, 1)]
+        # padding for different CNN layers
+        self._cnn_layers_padding = [(3, 3), (1, 1), (1, 1)]
+
+        cnn_dims = np.array(
+            [map_size, map_size], dtype=np.float32
+        )
+        
+        for kernel_size, stride in zip(
+            self._cnn_layers_kernel_size, self._cnn_layers_stride
+        ):
+            cnn_dims = self._conv_output_dim(
+                dimension=cnn_dims,
+                padding=np.array([0, 0], dtype=np.float32),
+                dilation=np.array([1, 1], dtype=np.float32),
+                kernel_size=np.array(kernel_size, dtype=np.float32),
+                stride=np.array(stride, dtype=np.float32),
+            )
+
+        self.cnn = nn.Sequential(
+            nn.Conv2d(
+                in_channels=self.input_channels,
+                out_channels=24,
+                kernel_size=self._cnn_layers_kernel_size[0],
+                stride=self._cnn_layers_stride[0],
+                padding=self._cnn_layers_padding[0],
+            ),
+            nn.BatchNorm2d(24),
+            nn.ReLU(True),
+            nn.Conv2d(
+                in_channels=24,
+                out_channels=24,
+                kernel_size=self._cnn_layers_kernel_size[1],
+                stride=self._cnn_layers_stride[1],
+                padding=self._cnn_layers_padding[1],
+            ),
+            nn.BatchNorm2d(24),
+            nn.ReLU(True),
+            nn.Conv2d(
+                in_channels=24,
+                out_channels=num_classes,
+                kernel_size=self._cnn_layers_kernel_size[2],
+                stride=self._cnn_layers_stride[2],
+                padding=self._cnn_layers_padding[2],
+            ),
+        )
+
+        self.layer_init()
+
+    def _conv_output_dim(
+        self, dimension, padding, dilation, kernel_size, stride
+    ):
+        r"""Calculates the output height and width based on the input
+        height and width to the convolution layer.
+
+        ref: https://pytorch.org/docs/master/nn.html#torch.nn.Conv2d
+        """
+        assert len(dimension) == 2
+        out_dimension = []
+        for i in range(len(dimension)):
+            out_dimension.append(
+                int(
+                    np.floor(
+                        (
+                            (
+                                dimension[i]
+                                + 2 * padding[i]
+                                - dilation[i] * (kernel_size[i] - 1)
+                                - 1
+                            )
+                            / stride[i]
+                        )
+                        + 1
+                    )
+                )
+            )
+        return tuple(out_dimension)
+
+    def layer_init(self):
+        for layer in self.cnn:
+            if isinstance(layer, (nn.Conv2d, nn.Linear)):
+                nn.init.kaiming_normal_(
+                    layer.weight, nn.init.calculate_gain("relu")
+                )
+                if layer.bias is not None:
+                    nn.init.constant_(layer.bias, val=0)
+        
+
+    def forward(self, observations):
+        return self.cnn(observations)
+    

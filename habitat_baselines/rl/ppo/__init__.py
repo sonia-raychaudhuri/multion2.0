@@ -7,13 +7,13 @@
 from habitat_baselines.rl.ppo.policy import (
     Net, BaselinePolicyNonOracle, PolicyNonOracle, BaselinePolicyOracle, PolicyOracle, 
     Policy, PolicyObjectRecog, BaselinePolicyObjectRecog, BaselinePolicyOracleMap, 
-    BaselinePolicyProjObjectRecog, PolicyProjObjectRecog
+    BaselinePolicySemantic, PolicySemantic
     )
 from habitat_baselines.rl.ppo.ppo import (PPONonOracle, PPOOracle, PPO, 
-                                          PPOObjectRecog, PPOOracleMap, PPOProjObjectRecog)
+                                          PPOObjectRecog, PPOOracleMap, PPOSemantic)
 
 __all__ = ["PPONonOracle", "PPOOracle", "PolicyNonOracle", "PolicyOracle", "RolloutStorageNonOracle", 
            "RolloutStorageOracle", "BaselinePolicyNonOracle", "BaselinePolicyOracle", "Policy", 
            "PPO", "PPOObjectRecog", "PolicyObjectRecog", "BaselinePolicyObjectRecog",
-           "BaselinePolicyOracleMap", "PPOOracleMap", "BaselinePolicyProjObjectRecog", 
-           "PolicyProjObjectRecog", "PPOProjObjectRecog"]
+           "BaselinePolicyOracleMap", "PPOOracleMap", "BaselinePolicySemantic", 
+           "PolicySemantic", "PPOSemantic"]

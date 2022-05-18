@@ -12,7 +12,7 @@ import torch.nn.functional as F
 from habitat_baselines.common.utils import CategoricalNet, Flatten, to_grid
 from habitat_baselines.rl.models.projection import Projection, RotateTensor, get_grid
 from habitat_baselines.rl.models.rnn_state_encoder import RNNStateEncoder
-from habitat_baselines.rl.models.simple_cnn import RGBCNNNonOracle, RGBCNNOracle, MapCNN, SimpleCNN
+from habitat_baselines.rl.models.simple_cnn import RGBCNNNonOracle, RGBCNNOracle, MapCNN, SimpleCNN, SemanticMapCNN
 from habitat_baselines.rl.models.projection import Projection
 
 from habitat.core.utils import try_cv2_import
@@ -141,7 +141,7 @@ class PolicyNonOracle(nn.Module):
 
         return value, action_log_probs, distribution_entropy, rnn_hidden_states
 
-class PolicyProjObjectRecog(nn.Module):
+class PolicySemantic(nn.Module):
     def __init__(self, net, dim_actions):
         super().__init__()
         self.net = net
@@ -152,6 +152,10 @@ class PolicyProjObjectRecog(nn.Module):
         )
         self.critic = CriticHead(self.net.output_size)
 
+    @property
+    def should_load_agent_state(self):
+        return True
+    
     def forward(self, *x):
         raise NotImplementedError
 
@@ -189,7 +193,7 @@ class PolicyProjObjectRecog(nn.Module):
     def evaluate_actions(
         self, observations, rnn_hidden_states, global_map, prev_actions, masks, action
     ):
-        features, rnn_hidden_states, global_map, obj_prob = self.net(
+        features, rnn_hidden_states, global_map, semantic_map = self.net(
             observations, rnn_hidden_states, global_map, prev_actions, masks, ev=1
         )
         distribution = self.action_distribution(features)
@@ -198,10 +202,10 @@ class PolicyProjObjectRecog(nn.Module):
         action_log_probs = distribution.log_probs(action)
         distribution_entropy = distribution.entropy().mean()
 
-        loss = nn.CrossEntropyLoss()
-        obj_recog_loss = loss(obj_prob, observations['objectCat'].long())
+        loss = nn.CrossEntropyLoss(reduction='mean')
+        semantic_map_loss = loss(semantic_map, observations['semMap'].long())
         
-        return value, action_log_probs, distribution_entropy, rnn_hidden_states, obj_recog_loss
+        return value, action_log_probs, distribution_entropy, rnn_hidden_states, semantic_map_loss
 
 
 class PolicyOracle(nn.Module):
@@ -344,7 +348,7 @@ class BaselinePolicyNonOracle(PolicyNonOracle):
             action_space.n,
         )
 
-class BaselinePolicyProjObjectRecog(PolicyProjObjectRecog):
+class BaselinePolicySemantic(PolicySemantic):
     def __init__(
         self,
         batch_size,
@@ -359,7 +363,7 @@ class BaselinePolicyProjObjectRecog(PolicyProjObjectRecog):
         hidden_size=512,
     ):
         super().__init__(
-            BaselineNetProjObjectRecog(
+            BaselineNetSemantic(
                 batch_size,
                 observation_space=observation_space,
                 hidden_size=hidden_size,
@@ -605,7 +609,7 @@ class BaselineNetNonOracle(Net):
             x, rnn_hidden_states = self.state_encoder(x, rnn_hidden_states, masks)
             return x, rnn_hidden_states, final_retrieval.permute(0, 2, 3, 1) 
 
-class BaselineNetProjObjectRecog(Net):
+class BaselineNetSemantic(Net):
     r"""Network which passes the input image through CNN and concatenates
     goal vector with CNN's output and passes that through RNN.
     """
@@ -628,32 +632,22 @@ class BaselineNetProjObjectRecog(Net):
         self.coordinate_max = self.config.RL.MAPS.coordinate_max
         self.coordinate_min = self.config.RL.MAPS.coordinate_min
         self.local_map_size = self.config.RL.MAPS.local_map_size
+        self.num_classes = 15
+        self.linear_out = 512
 
         self.visual_encoder = RGBCNNNonOracle(observation_space, hidden_size)
-        self.map_encoder = MapCNN(self.local_map_size, 256, "non-oracle")        
-
+        
+        # Map projection
         self.projection = Projection(self.egocentric_map_size, self.global_map_size, 
             device, self.coordinate_min, self.coordinate_max
         )
-
         self.to_grid = to_grid(self.global_map_size, self.coordinate_min, self.coordinate_max)
         self.rotate_tensor = RotateTensor(device)
 
-        self.image_features_linear = nn.Linear(self.global_map_depth * 28 * 28, 512)
+        self.image_features_linear = nn.Linear(self.global_map_depth * 28 * 28, self.linear_out)
 
         self.flatten = Flatten()
 
-        if self.use_previous_action:
-            self.state_encoder = RNNStateEncoder(
-                self._hidden_size + 256 + object_category_embedding_size + 
-                previous_action_embedding_size, self._hidden_size,
-            )
-        else:
-            self.state_encoder = RNNStateEncoder(
-                (0 if self.is_blind else self._hidden_size) + object_category_embedding_size,
-                self._hidden_size,   #Replace 2 by number of target categories later
-            )
-        self.goal_embedding = nn.Embedding(8, object_category_embedding_size)
         self.action_embedding = nn.Embedding(4, previous_action_embedding_size)
         self.full_global_map = torch.zeros(
             batch_size,
@@ -663,10 +657,45 @@ class BaselineNetProjObjectRecog(Net):
             device=self.device,
         )
         
-        # Object Category Prediction
-        self.obj_linear = nn.Linear(512, 10) # Number of object categories + 1
-        nn.init.orthogonal_(self.obj_linear.weight, gain=0.01)
-        nn.init.constant_(self.obj_linear.bias, 0)
+        # Semantic Map Prediction
+        self.sem_map_encoder = SemanticMapCNN(map_size=self.local_map_size, 
+                                              input_channels=self.global_map_depth, 
+                                              num_classes=self.num_classes)
+        self.object_embedding = nn.Embedding(self.num_classes, object_category_embedding_size)
+        
+        self.next_goal_map_encoder = nn.Sequential(
+            SemanticMapCNN(map_size=self.local_map_size, 
+                            input_channels=1, 
+                            num_classes=1),
+            nn.ReLU(True),
+            Flatten(),
+            nn.Linear(
+                self.local_map_size * self.local_map_size, 
+                self.linear_out)
+            )
+        self.next_goal_linear = nn.Linear(
+            self.local_map_size * self.local_map_size, 
+            self.linear_out)
+        
+        if self.use_previous_action:
+            self.state_encoder = RNNStateEncoder(
+                ((0 if self.is_blind 
+                  else self._hidden_size)           # visual_encoder
+                + object_category_embedding_size    # goal_embedding
+                + self.linear_out                   # next goal map embedding
+                + previous_action_embedding_size    # action_embedding
+                ), 
+                self._hidden_size,
+            )
+        else:
+            self.state_encoder = RNNStateEncoder(
+                ((0 if self.is_blind 
+                  else self._hidden_size)           # visual_encoder
+                + object_category_embedding_size    # goal_embedding
+                + self.linear_out                   # next goal map embedding
+                ), 
+                self._hidden_size,
+            )
 
         self.train()
 
@@ -686,8 +715,10 @@ class BaselineNetProjObjectRecog(Net):
         return observations[self.goal_sensor_uuid]
 
     def forward(self, observations, rnn_hidden_states, global_map, prev_actions, masks, ev=0):
-        target_encoding = self.get_target_encoding(observations)
-        goal_embed = self.goal_embedding((target_encoding).type(torch.LongTensor).to(self.device)).squeeze(1)
+        target_encoding = torch.add(
+            (self.get_target_encoding(observations)).type(torch.LongTensor).to(self.device), 
+            3) # add 3 to match sem_map obj categories (refer to env.py)
+        goal_embed = self.object_embedding(target_encoding).squeeze(1)
         
         if not self.is_blind:
             perception_embed_feats = self.visual_encoder(observations)
@@ -736,19 +767,24 @@ class BaselineNetProjObjectRecog(Net):
                 self.global_map_size//2-math.floor(self.local_map_size/2):self.global_map_size//2+math.ceil(self.local_map_size/2)
             ]
             final_retrieval = self.rotate_tensor.forward(translated_retrieval, observations["compass"])
-
-            global_map_embed = self.map_encoder(final_retrieval.permute(0, 2, 3, 1))
+            
+            # semantic category prediction
+            sem_map_feats = self.sem_map_encoder(final_retrieval)
+            
+            next_goal_map_embed = torch.nn.functional.cosine_similarity(
+                final_retrieval.permute(0,2,3,1),
+                goal_embed.unsqueeze(1).unsqueeze(1),
+                dim=-1)
+            next_goal_linear = self.next_goal_map_encoder(next_goal_map_embed.unsqueeze(1))
 
             if self.use_previous_action:
                 action_embedding = self.action_embedding(prev_actions).squeeze(1)
 
-            x = torch.cat((perception_embed, global_map_embed, goal_embed, action_embedding), dim = 1)
+            x = torch.cat((perception_embed, next_goal_linear, goal_embed, action_embedding), dim = 1)
+            
             x, rnn_hidden_states = self.state_encoder(x, rnn_hidden_states.permute(1, 0, 2), masks)
             
-            # Object category prediction
-            obj_prob = self.obj_linear(perception_embed)
-            
-            return x, rnn_hidden_states.permute(1, 0, 2), final_retrieval.permute(0, 2, 3, 1), obj_prob
+            return x, rnn_hidden_states.permute(1, 0, 2), final_retrieval.permute(0, 2, 3, 1), sem_map_feats
         else: 
             global_map = global_map * masks.unsqueeze(1).unsqueeze(1)  ##verify
             with torch.cuda.device(self.device):
@@ -760,18 +796,23 @@ class BaselineNetProjObjectRecog(Net):
             
             final_retrieval = torch.max(global_map, agent_view.permute(0, 2, 3, 1))
 
-            global_map_embed = self.map_encoder(final_retrieval)
+            # semantic category prediction
+            sem_map_feats = self.sem_map_encoder(final_retrieval.permute(0,3,1,2))
+            
+            next_goal_map_embed = torch.nn.functional.cosine_similarity(
+                final_retrieval,
+                goal_embed.unsqueeze(1).unsqueeze(1),
+                dim=-1)
+            next_goal_linear = self.next_goal_map_encoder(next_goal_map_embed.unsqueeze(1))
 
             if self.use_previous_action:
                 action_embedding = self.action_embedding(prev_actions).squeeze(1)
 
-            x = torch.cat((perception_embed, global_map_embed, goal_embed, action_embedding), dim = 1)
+            x = torch.cat((perception_embed, next_goal_linear, goal_embed, action_embedding), dim = 1)
+            
             x, rnn_hidden_states = self.state_encoder(x, rnn_hidden_states.permute(1, 0, 2), masks)
             
-            # Object category prediction
-            obj_prob = self.obj_linear(perception_embed)
-            
-            return x, rnn_hidden_states.permute(1, 0, 2), final_retrieval.permute(0, 2, 3, 1), obj_prob 
+            return x, rnn_hidden_states.permute(1, 0, 2), final_retrieval, sem_map_feats
             
             
 

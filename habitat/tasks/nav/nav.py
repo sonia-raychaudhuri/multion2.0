@@ -503,6 +503,57 @@ class ProximitySensor(Sensor):
         )
 
 
+@registry.register_sensor
+class SemanticMapSensor(Sensor):
+    r""" Sensor for Semantic Map
+    frame.
+    Args:
+        sim: reference to the simulator for calculating task observations.
+        config: config for the sensor.
+    """
+    cls_uuid: str = "semMap"
+    def __init__(
+        self, sim: Simulator, config: Config, *args: Any, **kwargs: Any
+    ):
+        self._sim = sim
+        self.map_size = config.EGOCENTRIC_MAP_SIZE
+        self.map_size_mid = (self.map_size//2)
+        self.cropped_map_size = config.CROPPED_MAP_SIZE
+        self.cropped_map_mid = (self.cropped_map_size//2)
+        self.meters_per_pixel = config.METERS_PER_PIXEL
+        self.map_channels = config.MAP_CHANNELS
+        
+        self.mapCache = {}
+        self.count = 0
+        
+        super().__init__(config=config)
+
+    def _get_uuid(self, *args: Any, **kwargs: Any):
+        return self.cls_uuid
+
+    def _get_sensor_type(self, *args: Any, **kwargs: Any):
+        return SensorTypes.MEASUREMENT
+
+    def _get_observation_space(self, *args: Any, **kwargs: Any):
+        return spaces.Box(
+            low=np.finfo(np.float32).min,
+            high=np.finfo(np.float32).max,
+            shape=(self.map_size, self.map_size),
+            dtype=np.float32,
+        )
+
+    def get_observation(
+        self, observations, episode, *args: Any, **kwargs: Any
+    ):
+        
+        if "semMap" in observations:
+            sem_map = observations["semMap"][:,:,:,1]
+        else:
+            sem_map = np.zeros((self.map_size, self.map_size))
+        
+        return sem_map
+
+
 @registry.register_measure
 class Success(Measure):
     r"""Whether or not the agent succeeded at its task.

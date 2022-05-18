@@ -89,6 +89,7 @@ _C.RL.PPO.ppo_epoch = 4
 _C.RL.PPO.num_mini_batch = 16
 _C.RL.PPO.value_loss_coef = 0.5
 _C.RL.PPO.obj_recog_loss_coef = 0.01
+_C.RL.PPO.semantic_map_loss_coef = 0.01
 _C.RL.PPO.entropy_coef = 0.01
 _C.RL.PPO.lr = 7e-4
 _C.RL.PPO.eps = 1e-5

@@ -4,6 +4,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+from cmath import nan
 import random
 import time
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, cast
@@ -141,9 +142,9 @@ class Env:
         self._episode_start_time: Optional[float] = None
         self._episode_over = False
         self._map_resolution = 300
-        self.meters_per_pixel = self._config.TASK["MAP_RESOLUTION"] if "MAP_RESOLUTION" in self._config.TASK else 0.8
+        self.meters_per_pixel = self._config.TASK["MAP_RESOLUTION"] if "MAP_RESOLUTION" in self._config.TASK else 0.5
         self.cropped_map_size = 80
-        if config.TRAINER_NAME in ["oracle", "oracle-ego"]:
+        if config.TRAINER_NAME in ["oracle", "oracle-ego", "semantic"]:
             self.mapCache = {}
             """ with open(config.TASK.ORACLE_MAP_PATH, 'rb') as handle:
                 self.mapCache = pickle.load(handle) """
@@ -153,9 +154,6 @@ class Env:
         if config.TRAINER_NAME == "obj-recog":
             with open(config.TASK.ORACLE_MAP_PATH, 'rb') as handle:
                 self.mapCache = pickle.load(handle)
-            self.objGraph = np.empty((300,300,3))
-            self.objGraph.fill(0)
-        if config.TRAINER_NAME == "proj-obj-recog":
             self.objGraph = np.empty((300,300,3))
             self.objGraph.fill(0)
 
@@ -309,13 +307,14 @@ class Env:
                 self._sim.set_object_motion_type(habitat_sim.physics.MotionType.STATIC, ind)
 
         observations = self.task.reset(episode=self.current_episode)
-        if self._config.TRAINER_NAME in ["oracle", "oracle-ego", "obj-recog"]:
+        if self._config.TRAINER_NAME in ["oracle", "oracle-ego", "obj-recog", "semantic"]:
             #self.currMap = np.copy(self.mapCache[f"../multiON/{self.current_episode.scene_id}"])
             agent_vertical_pos = str(round(observations["agent_position"][1],2))
             if (self.current_episode.scene_id in self.mapCache and 
                     agent_vertical_pos in self.mapCache[self.current_episode.scene_id]):
-                self.currMap = self.mapCache[self.current_episode.scene_id][agent_vertical_pos]
+                self.currMap = self.mapCache[self.current_episode.scene_id][agent_vertical_pos].copy()
             else:
+                # topdown map obtained from habitat has 0 if occupied, 1 if unoccupied
                 top_down_map = maps.get_topdown_map_from_sim(
                     self._sim,
                     draw_border=False,
@@ -333,14 +332,21 @@ class Env:
                     max(range_y[0] - padding, 0),
                     min(range_y[-1] + padding + 1, top_down_map.shape[1]),
                 )
+                
+                # update topdown map to have 1 if occupied, 2 if unoccupied
                 top_down_map[range_x[0] : range_x[1], range_y[0] : range_y[1]] += 1
-                self.currMap = np.zeros((top_down_map.shape[0],top_down_map.shape[1],3))
-                self.currMap[:top_down_map.shape[0], :top_down_map.shape[1], 0] = top_down_map
+                
+                if self._config.TRAINER_NAME in ["oracle-ego", "semantic"]:
+                    top_down_map[range_x[0] : range_x[1], range_y[0] : range_y[1]] += 1
+                
+                tmp_map = np.zeros((top_down_map.shape[0],top_down_map.shape[1],3))
+                tmp_map[:top_down_map.shape[0], :top_down_map.shape[1], 0] = top_down_map
                 
                 if self.current_episode.scene_id not in self.mapCache:
                     self.mapCache[self.current_episode.scene_id] = {}
-                self.mapCache[self.current_episode.scene_id][agent_vertical_pos] = self.currMap
-            
+                self.mapCache[self.current_episode.scene_id][agent_vertical_pos] = tmp_map
+                self.currMap = tmp_map.copy()
+                
             #self.task.occMap = self.currMap[:,:,0]
             self.task.sceneMap = self.currMap[:,:,0]
         
@@ -520,9 +526,12 @@ class Env:
                     observations["objectCat"] = 0
             else:
                 observations["objectCat"] = 0
-        elif self._config.TRAINER_NAME in ["proj-obj-recog"]:
-            self.objGraph.fill(0)
+        elif self._config.TRAINER_NAME in ["semantic"]:
+            # Currently we are not considering occupancy
             channel_num = 1
+            self.currMap[:, :, 1] += 2  # rest of the cells are 1 or 2 depending on FOW mask
+            objIndexOffset = 3          # obj category starts from 3 (refer to above line)
+
             # Adding goal information on the map
             for i in range(len(self.current_episode.goals)):
                 loc0 = self.current_episode.goals[i].position[0]
@@ -534,13 +543,30 @@ class Env:
                     self.currMap.shape[0:2],
                     sim=self._sim,
                 )
-                objIndexOffset = 1
-                # Marking category of the goals
-                self.objGraph[grid_loc[0]-3:grid_loc[0]+4, grid_loc[1]-3:grid_loc[1]+4, 0] = object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
-                self.objGraph[grid_loc[0]-3:grid_loc[0]+4, grid_loc[1]-3:grid_loc[1]+4, 1] = loc0
-                self.objGraph[grid_loc[0]-3:grid_loc[0]+4, grid_loc[1]-3:grid_loc[1]+4, 2] = loc2
+                self.currMap[
+                    grid_loc[0]-1:grid_loc[0]+2, 
+                    grid_loc[1]-1:grid_loc[1]+2, 
+                    channel_num] = (object_to_datset_mapping[self.current_episode.goals[i].object_category] 
+                                                + objIndexOffset)
                 
-            #currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+            if self._config["TASK"]["INCLUDE_DISTRACTORS"]:
+                # Adding distractor information on the map
+                num_distr = self._config["TASK"]["NUM_DISTRACTORS"] if self._config["TASK"]["NUM_DISTRACTORS"] > 0 else len(self.current_episode.distractors)
+                for i in range(num_distr):
+                    loc0 = self.current_episode.distractors[i].position[0]
+                    loc2 = self.current_episode.distractors[i].position[2]
+                    #grid_loc = self.conv_grid(loc0, loc2)
+                    grid_loc = maps.to_grid(
+                        loc2,
+                        loc0,
+                        self.currMap.shape[0:2],
+                        sim=self._sim,
+                    )
+                    self.currMap[grid_loc[0]-1:grid_loc[0]+2, 
+                                 grid_loc[1]-1:grid_loc[1]+2, 
+                                 channel_num] = (object_to_datset_mapping[self.current_episode.distractors[i].object_category] 
+                                                                            + objIndexOffset)
+
             currPix = maps.to_grid(
                     observations["agent_position"][2],
                     observations["agent_position"][0],
@@ -548,22 +574,33 @@ class Env:
                     sim=self._sim,
                 )
             
-            # code for object category
-            if self.objGraph[currPix[0], currPix[1], 0] != 0:
-                vector = np.array([self.objGraph[currPix[0], currPix[1], 1], self.objGraph[currPix[0], currPix[1], 2]]) - \
-                    np.array([observations["agent_position"][0], observations["agent_position"][2]])
-                goalToAgentHeading = np.arctan2(-vector[0], -vector[1]) * 180 / np.pi
-                includedAng = np.absolute((observations["heading"][0] * 180/np.pi) - goalToAgentHeading)
-                if includedAng > 180.0:
-                    includedAng = 360.0 -180.0
-                assert includedAng >= 0
-                assert includedAng <= 180.0
-                if includedAng < 40.0: 
-                    observations["objectCat"] = self.objGraph[currPix[0], currPix[1], 0]
+            """ self.expose = np.repeat(
+                self.task.measurements.measures["fow_map"].get_metric()[:, :, np.newaxis], 3, axis = 2
+            )
+            patch_tmp = self.currMap * self.expose """
+            patch_tmp = self.currMap
+            
+            patch = patch_tmp[max(currPix[0]-40,0):currPix[0]+40, max(currPix[1]-40,0):currPix[1]+40,:]
+            if patch.shape[0] < 80 or patch.shape[1] < 80:
+                if currPix[0] < 40:
+                    curr_x = currPix[0]
                 else:
-                    observations["objectCat"] = 0
-            else:
-                observations["objectCat"] = 0
+                    curr_x = 40
+                if currPix[1] < 40:
+                    curr_y = currPix[1]
+                else:
+                    curr_y = 40
+                    
+                map_mid = (80//2)
+                tmp = np.zeros((80, 80,3))
+                tmp[map_mid-curr_x:map_mid-curr_x+patch.shape[0],
+                        map_mid-curr_y:map_mid-curr_y+patch.shape[1], :] = patch
+                patch = tmp
+                
+            patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, axes=(0,1), order=0, reshape=False)
+            
+            sem_map = patch[40-25:40+26, 40-25:40+26, 1]
+            observations["semMap"] = sem_map
             
         return observations
 
@@ -711,31 +748,41 @@ class Env:
                     observations["objectCat"] = 0
             else:
                 observations["objectCat"] = 0
-        elif self._config.TRAINER_NAME in ["proj-obj-recog"]:
-            #currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+        elif self._config.TRAINER_NAME in ["semantic"]:
             currPix = maps.to_grid(
                     observations["agent_position"][2],
                     observations["agent_position"][0],
                     self.currMap.shape[0:2],
                     sim=self._sim,
                 )
+                
+            """ self.expose = np.repeat(
+                self.task.measurements.measures["fow_map"].get_metric()[:, :, np.newaxis], 3, axis = 2
+            )
+            patch_tmp = self.currMap * self.expose """
+            patch_tmp = self.currMap
             
-            # code for object category
-            if self.objGraph[currPix[0], currPix[1], 0] != 0:
-                vector = np.array([self.objGraph[currPix[0], currPix[1], 1], self.objGraph[currPix[0], currPix[1], 2]]) - \
-                    np.array([observations["agent_position"][0], observations["agent_position"][2]])
-                goalToAgentHeading = np.arctan2(-vector[0], -vector[1]) * 180 / np.pi
-                includedAng = np.absolute((observations["heading"][0] * 180/np.pi) - goalToAgentHeading)
-                if includedAng > 180.0:
-                    includedAng = 360.0 -180.0
-                assert includedAng >= 0
-                assert includedAng <= 180.0
-                if includedAng < 40.0: 
-                    observations["objectCat"] = self.objGraph[currPix[0], currPix[1], 0]
+            patch = patch_tmp[max(currPix[0]-40,0):currPix[0]+40, max(currPix[1]-40,0):currPix[1]+40,:]
+            if patch.shape[0] < 80 or patch.shape[1] < 80:
+                if currPix[0] < 40:
+                    curr_x = currPix[0]
                 else:
-                    observations["objectCat"] = 0
-            else:
-                observations["objectCat"] = 0
+                    curr_x = 40
+                if currPix[1] < 40:
+                    curr_y = currPix[1]
+                else:
+                    curr_y = 40
+                    
+                map_mid = (80//2)
+                tmp = np.zeros((80, 80,3))
+                tmp[map_mid-curr_x:map_mid-curr_x+patch.shape[0],
+                        map_mid-curr_y:map_mid-curr_y+patch.shape[1], :] = patch
+                patch = tmp
+                
+            patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, axes=(0,1), order=0, reshape=False)
+            
+            sem_map = patch[40-25:40+26, 40-25:40+26, 1]
+            observations["semMap"] = sem_map
             
         ##Terminates episode if wrong found is called
         if self.task.is_found_called == True and \

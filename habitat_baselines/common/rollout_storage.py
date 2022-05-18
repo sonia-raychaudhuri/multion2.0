@@ -508,7 +508,7 @@ class RolloutStorageOracle:
         """
         return tensor.view(t * n, *tensor.size()[2:])
     
-class RolloutStorageProjObjRecog:
+class RolloutStorageSemantic:
     r"""Class for storing rollout information for RL trainers."""
 
     def __init__(
@@ -525,6 +525,7 @@ class RolloutStorageProjObjRecog:
         global_map_size:int = 275,
         global_map_depth:int = 32,
         local_map_size:int = 51,
+        num_classes:int = 10
     ):
         self.buffers = TensorDict()
         self.buffers["observations"] = TensorDict()
@@ -541,11 +542,13 @@ class RolloutStorageProjObjRecog:
                 )
             )
 
-        self.buffers["observations"]["objectCat"] = torch.Tensor(
+        self.buffers["observations"]["semMap"] = torch.zeros(
                 numsteps+1, 
-                num_envs
-            ).fill_(0)
-        
+                num_envs,
+                local_map_size,
+                local_map_size
+            )
+
         # Stores cropped and rotated map
         self.buffers["global_map"] = torch.zeros(
             numsteps + 1,

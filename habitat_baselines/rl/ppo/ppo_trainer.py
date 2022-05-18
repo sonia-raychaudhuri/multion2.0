@@ -33,7 +33,7 @@ from habitat_baselines.common.environments import get_env_class
 from habitat_baselines.common.rollout_storage import (
     RolloutStorageOracle, RolloutStorageNonOracle, 
     RolloutStorageObjRecog, RolloutStorageOracleMap,
-    RolloutStorageProjObjRecog)
+    RolloutStorageSemantic)
 from habitat_baselines.common.tensorboard_utils import (
     TensorboardWriter,
     get_writer,
@@ -54,7 +54,7 @@ from habitat_baselines.utils.common import (
 from habitat_baselines.rl.ppo import (
     PPONonOracle, PPOOracle, BaselinePolicyNonOracle, BaselinePolicyOracle,
     PPOObjectRecog, BaselinePolicyObjectRecog, BaselinePolicyOracleMap, PPOOracleMap,
-    BaselinePolicyProjObjectRecog, PPOProjObjectRecog)
+    BaselinePolicySemantic, PPOSemantic)
 from habitat_baselines.common.rollout_storage import RolloutStorage
 from habitat_baselines.common.tensorboard_utils import TensorboardWriter
 from habitat_baselines.rl.ddppo.algo import DDPPO
@@ -2011,8 +2011,8 @@ class PPOTrainerObjectRecog(PPOTrainer):
 
         self.envs.close()
 
-@baseline_registry.register_trainer(name="proj-obj-recog")
-class PPOTrainerProjObjectRecog(PPOTrainer):
+@baseline_registry.register_trainer(name="semantic")
+class PPOTrainerSemantic(PPOTrainer):
     r"""Trainer class for Proj-Neural + ObjectRecog
     """
 
@@ -2126,7 +2126,7 @@ class PPOTrainerProjObjectRecog(PPOTrainer):
 
         self._nbuffers = 2 if ppo_cfg.use_double_buffered_sampler else 1
 
-        self.rollouts = RolloutStorageProjObjRecog(
+        self.rollouts = RolloutStorageSemantic(
             ppo_cfg.num_steps,
             self.envs.num_envs,
             obs_space,
@@ -2184,7 +2184,7 @@ class PPOTrainerProjObjectRecog(PPOTrainer):
             observation_space, self.obs_transforms
         )
         
-        self.actor_critic = BaselinePolicyProjObjectRecog(
+        self.actor_critic = BaselinePolicySemantic(
             batch_size=self.config.NUM_PROCESSES,
             observation_space=observation_space,
             action_space=self.envs.action_spaces[0],
@@ -2233,14 +2233,14 @@ class PPOTrainerProjObjectRecog(PPOTrainer):
             nn.init.orthogonal_(self.actor_critic.critic.fc.weight)
             nn.init.constant_(self.actor_critic.critic.fc.bias, 0)
 
-        self.agent = PPOProjObjectRecog(
+        self.agent = PPOSemantic(
             actor_critic=self.actor_critic,
             clip_param=ppo_cfg.clip_param,
             ppo_epoch=ppo_cfg.ppo_epoch,
             num_mini_batch=ppo_cfg.num_mini_batch,
             value_loss_coef=ppo_cfg.value_loss_coef,
             entropy_coef=ppo_cfg.entropy_coef,
-            obj_recog_loss_coef=ppo_cfg.obj_recog_loss_coef,
+            semantic_map_loss_coef=ppo_cfg.semantic_map_loss_coef,
             lr=ppo_cfg.lr,
             eps=ppo_cfg.eps,
             max_grad_norm=ppo_cfg.max_grad_norm,
@@ -2335,7 +2335,7 @@ class PPOTrainerProjObjectRecog(PPOTrainer):
 
         self.agent.train()
 
-        value_loss, action_loss, dist_entropy, objec_recog_loss = self.agent.update(
+        value_loss, action_loss, dist_entropy, semantic_map_loss = self.agent.update(
             self.rollouts
         )
 
@@ -2346,7 +2346,7 @@ class PPOTrainerProjObjectRecog(PPOTrainer):
             value_loss,
             action_loss,
             dist_entropy,
-            objec_recog_loss,
+            semantic_map_loss,
         )
 
     @rank0_only
@@ -2411,7 +2411,7 @@ class PPOTrainerProjObjectRecog(PPOTrainer):
 
         fps = self.num_steps_done / ((time.time() - self.t_start) + prev_time)
         #writer.add_scalar("metrics/fps", fps, self.num_steps_done)
-
+        
         # log stats
         if self.num_updates_done % self.config.LOG_INTERVAL == 0:
             logger.info(
@@ -2573,7 +2573,7 @@ class PPOTrainerProjObjectRecog(PPOTrainer):
                     value_loss,
                     action_loss,
                     dist_entropy,
-                    objec_recog_loss,
+                    semantic_map_loss,
                 ) = self._update_agent()
 
                 if ppo_cfg.use_linear_lr_decay:
@@ -2584,7 +2584,7 @@ class PPOTrainerProjObjectRecog(PPOTrainer):
                     dict(
                         value_loss=value_loss,
                         action_loss=action_loss,
-                        objec_recog_loss=objec_recog_loss,
+                        semantic_map_loss=semantic_map_loss,
                         entropy=dist_entropy,
                     ),
                     count_steps_delta,
