@@ -29,6 +29,7 @@ from habitat.utils import profiling_wrapper
 import habitat_sim
 import magnum as mn
 from habitat.utils.visualizations import maps
+from PIL import Image
 
 # debug
 COORDINATE_EPSILON = 1e-6
@@ -143,7 +144,8 @@ class Env:
         self._episode_over = False
         self._map_resolution = 300
         self.meters_per_pixel = self._config.TASK["MAP_RESOLUTION"] if "MAP_RESOLUTION" in self._config.TASK else 0.5
-        self.cropped_map_size = 80
+        self.cropped_map_size = self._config.TASK["CROP_MAP_SIZE"] if "CROP_MAP_SIZE" in self._config.TASK else 80
+        self.egocentric_map_size = self._config.TASK["EGO_MAP_SIZE"] if "EGO_MAP_SIZE" in self._config.TASK else 13
         if config.TRAINER_NAME in ["oracle", "oracle-ego", "semantic"]:
             self.mapCache = {}
             """ with open(config.TASK.ORACLE_MAP_PATH, 'rb') as handle:
@@ -580,26 +582,39 @@ class Env:
             patch_tmp = self.currMap * self.expose """
             patch_tmp = self.currMap
             
-            patch = patch_tmp[max(currPix[0]-40,0):currPix[0]+40, max(currPix[1]-40,0):currPix[1]+40,:]
-            if patch.shape[0] < 80 or patch.shape[1] < 80:
-                if currPix[0] < 40:
+            cropped_map_mid = (self.cropped_map_size//2)
+            # Crop around agent: agent is at the center
+            patch = patch_tmp[max(currPix[0]-cropped_map_mid,0):currPix[0]+cropped_map_mid, 
+                              max(currPix[1]-cropped_map_mid,0):currPix[1]+cropped_map_mid,:]
+            if patch.shape[0] < self.cropped_map_size or patch.shape[1] < self.cropped_map_size:
+                if currPix[0] < cropped_map_mid:
                     curr_x = currPix[0]
                 else:
-                    curr_x = 40
-                if currPix[1] < 40:
+                    curr_x = cropped_map_mid
+                if currPix[1] < cropped_map_mid:
                     curr_y = currPix[1]
                 else:
-                    curr_y = 40
-                    
-                map_mid = (80//2)
-                tmp = np.zeros((80, 80,3))
-                tmp[map_mid-curr_x:map_mid-curr_x+patch.shape[0],
-                        map_mid-curr_y:map_mid-curr_y+patch.shape[1], :] = patch
+                    curr_y = cropped_map_mid
+
+                tmp = np.zeros((self.cropped_map_size, self.cropped_map_size, 3))
+                tmp[cropped_map_mid-curr_x:cropped_map_mid-curr_x+patch.shape[0],
+                        cropped_map_mid-curr_y:cropped_map_mid-curr_y+patch.shape[1], :] = patch
                 patch = tmp
                 
             patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, axes=(0,1), order=0, reshape=False)
             
-            sem_map = patch[40-25:40+26, 40-25:40+26, 1]
+            # agent is on bottom center
+            ego_map_mid = (self.egocentric_map_size//2)
+            sem_map = patch[cropped_map_mid-ego_map_mid:cropped_map_mid+ego_map_mid+1, 
+                            cropped_map_mid:cropped_map_mid+self.egocentric_map_size, 1]
+            
+            """ Image.fromarray(
+                maps.colorize_topdown_map(
+                    (sem_map-3+maps.MULTION_TOP_DOWN_MAP_START).astype(np.uint8)
+                    )
+                ).save(
+                f"test_maps/{self.current_episode.episode_id}_new_0.png")
+            self.count = 0 """
             observations["semMap"] = sem_map
             
         return observations
@@ -762,26 +777,38 @@ class Env:
             patch_tmp = self.currMap * self.expose """
             patch_tmp = self.currMap
             
-            patch = patch_tmp[max(currPix[0]-40,0):currPix[0]+40, max(currPix[1]-40,0):currPix[1]+40,:]
-            if patch.shape[0] < 80 or patch.shape[1] < 80:
-                if currPix[0] < 40:
+            cropped_map_mid = (self.cropped_map_size//2)
+            # Crop around agent: agent is at the center
+            patch = patch_tmp[max(currPix[0]-cropped_map_mid,0):currPix[0]+cropped_map_mid, 
+                              max(currPix[1]-cropped_map_mid,0):currPix[1]+cropped_map_mid,:]
+            if patch.shape[0] < self.cropped_map_size or patch.shape[1] < self.cropped_map_size:
+                if currPix[0] < cropped_map_mid:
                     curr_x = currPix[0]
                 else:
-                    curr_x = 40
-                if currPix[1] < 40:
+                    curr_x = cropped_map_mid
+                if currPix[1] < cropped_map_mid:
                     curr_y = currPix[1]
                 else:
-                    curr_y = 40
-                    
-                map_mid = (80//2)
-                tmp = np.zeros((80, 80,3))
-                tmp[map_mid-curr_x:map_mid-curr_x+patch.shape[0],
-                        map_mid-curr_y:map_mid-curr_y+patch.shape[1], :] = patch
+                    curr_y = cropped_map_mid
+
+                tmp = np.zeros((self.cropped_map_size, self.cropped_map_size, 3))
+                tmp[cropped_map_mid-curr_x:cropped_map_mid-curr_x+patch.shape[0],
+                        cropped_map_mid-curr_y:cropped_map_mid-curr_y+patch.shape[1], :] = patch
                 patch = tmp
                 
             patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, axes=(0,1), order=0, reshape=False)
             
-            sem_map = patch[40-25:40+26, 40-25:40+26, 1]
+            # agent is on bottom center
+            ego_map_mid = (self.egocentric_map_size//2)
+            sem_map = patch[cropped_map_mid-ego_map_mid:cropped_map_mid+ego_map_mid+1, 
+                            cropped_map_mid:cropped_map_mid+self.egocentric_map_size, 1]
+            """ Image.fromarray(
+                maps.colorize_topdown_map(
+                    (sem_map-3+maps.MULTION_TOP_DOWN_MAP_START).astype(np.uint8)
+                    )
+                ).save(
+                f"test_maps/{self.current_episode.episode_id}_new_{self.count}.png")
+            self.count += 1 """
             observations["semMap"] = sem_map
             
         ##Terminates episode if wrong found is called

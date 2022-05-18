@@ -1160,7 +1160,7 @@ class TopDownMap(Measure):
         for goal in episode.goals:
             if self._is_on_same_floor(goal.position[1]):
                 try:
-                    color_ind = maps.MULTION_OBJECT_CATEGORY[goal.object_category]
+                    color_ind = maps.MULTION_CYL_OBJECT_CATEGORY[goal.object_category]
                     self._draw_point(
                         goal.position, (maps.MULTION_TOP_DOWN_MAP_START + color_ind)
                     )
@@ -1169,7 +1169,7 @@ class TopDownMap(Measure):
         for distractor in episode.distractors:
             if self._is_on_same_floor(distractor.position[1]):
                 try:
-                    color_ind = maps.MULTION_OBJECT_CATEGORY[distractor.object_category]
+                    color_ind = maps.MULTION_CYL_OBJECT_CATEGORY[distractor.object_category]
                     self._draw_point(
                         distractor.position, (maps.MULTION_TOP_DOWN_MAP_START + color_ind)
                     )
