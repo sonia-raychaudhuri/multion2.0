@@ -522,11 +522,9 @@ class RolloutStorageSemantic:
         action_shape: Optional[Tuple[int]] = None,
         is_double_buffered: bool = False,
         discrete_actions: bool = True,
-        global_map_size:int = 275,
-        global_map_depth:int = 32,
         local_map_size:int = 51,
         egocentric_map_size:int = 13,
-        num_classes:int = 15,      # same as policy.py
+        num_classes:int = 15,
     ):
         self.buffers = TensorDict()
         self.buffers["observations"] = TensorDict()
@@ -544,6 +542,13 @@ class RolloutStorageSemantic:
             )
 
         self.buffers["observations"]["semMap"] = torch.zeros(
+                numsteps+1, 
+                num_envs,
+                egocentric_map_size,
+                egocentric_map_size
+            )
+
+        self.buffers["observations"]["occMap"] = torch.zeros(
                 numsteps+1, 
                 num_envs,
                 egocentric_map_size,

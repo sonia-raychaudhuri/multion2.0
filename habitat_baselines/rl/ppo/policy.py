@@ -170,7 +170,7 @@ class PolicySemantic(nn.Module):
         masks,
         deterministic=False,
     ):
-        features, rnn_hidden_states, global_map, _ = self.net(
+        features, rnn_hidden_states, global_map, _, _ = self.net(
             observations, rnn_hidden_states, global_map, prev_actions, masks
         )
 
@@ -187,7 +187,7 @@ class PolicySemantic(nn.Module):
         return value, action, action_log_probs, rnn_hidden_states, global_map
 
     def get_value(self, observations, rnn_hidden_states, global_map, prev_actions, masks):
-        features, _, _, _ = self.net(
+        features, _, _, _, _ = self.net(
             observations, rnn_hidden_states, global_map, prev_actions, masks
         )
         return self.critic(features)
@@ -195,7 +195,7 @@ class PolicySemantic(nn.Module):
     def evaluate_actions(
         self, observations, rnn_hidden_states, global_map, prev_actions, masks, action
     ):
-        features, rnn_hidden_states, global_map, semantic_map = self.net(
+        features, rnn_hidden_states, global_map, semantic_map, occupancy_map = self.net(
             observations, rnn_hidden_states, global_map, prev_actions, masks, ev=1
         )
         distribution = self.action_distribution(features)
@@ -207,7 +207,9 @@ class PolicySemantic(nn.Module):
         loss = nn.CrossEntropyLoss(reduction='mean')
         semantic_map_loss = loss(semantic_map, observations['semMap'].long())
         
-        return value, action_log_probs, distribution_entropy, rnn_hidden_states, semantic_map_loss
+        occupancy_map_loss = loss(occupancy_map, observations['occMap'].long())
+        
+        return value, action_log_probs, distribution_entropy, rnn_hidden_states, semantic_map_loss, occupancy_map_loss
 
 
 class PolicyOracle(nn.Module):
@@ -634,8 +636,10 @@ class BaselineNetSemantic(Net):
         self.coordinate_max = self.config.RL.MAPS.coordinate_max
         self.coordinate_min = self.config.RL.MAPS.coordinate_min
         self.local_map_size = self.config.RL.MAPS.local_map_size
-        self.num_classes = 15
-        self.linear_out = 512
+        self.num_classes = self.config.RL.MAPS.num_classes
+        self.num_occ_classes = self.config.RL.MAPS.num_occ_classes
+        self.linear_out = self.config.RL.MAPS.linear_out
+        self.use_occupancy = self.config.RL.MAPS.USE_OCCUPANCY
 
         self.visual_encoder = RGBCNNNonOracle(observation_space, hidden_size)
         
@@ -661,7 +665,7 @@ class BaselineNetSemantic(Net):
         )
         
         # Semantic Map Prediction
-        self.sem_map_encoder = SemanticMapCNN(map_size=self.local_map_size, 
+        self.sem_map_encoder = SemanticMapCNN(map_size=self.egocentric_map_size, 
                                               input_channels=self.global_map_depth, 
                                               num_classes=self.num_classes)
         self.object_embedding = nn.Embedding(self.num_classes, object_category_embedding_size)
@@ -677,26 +681,26 @@ class BaselineNetSemantic(Net):
                 self.linear_out)
             )
         
-        if self.use_previous_action:
-            self.state_encoder = RNNStateEncoder(
-                ((0 if self.is_blind 
-                  else self._hidden_size)           # visual_encoder
-                + object_category_embedding_size    # goal_embedding
-                + self.linear_out                   # next goal map embedding
-                + previous_action_embedding_size    # action_embedding
-                ), 
-                self._hidden_size,
-            )
-        else:
-            self.state_encoder = RNNStateEncoder(
-                ((0 if self.is_blind 
-                  else self._hidden_size)           # visual_encoder
-                + object_category_embedding_size    # goal_embedding
-                + self.linear_out                   # next goal map embedding
-                ), 
-                self._hidden_size,
-            )
-
+        self.occupancy_encoder = SemanticMapCNN(map_size=self.egocentric_map_size, 
+                                            input_channels=self.global_map_depth, 
+                                            num_classes=self.num_occ_classes)
+        self.occupancy_linear = nn.Linear(
+                                    self.egocentric_map_size * self.egocentric_map_size * self.num_occ_classes, 
+                                    self.linear_out
+                                )
+        
+        self.state_encoder = RNNStateEncoder(
+            ((0 if self.is_blind 
+                else self._hidden_size)           # visual_encoder
+            + object_category_embedding_size    # goal_embedding
+            + self.linear_out                   # next goal map embedding
+            + self.linear_out                   # occupancy_encoder
+            + (previous_action_embedding_size 
+                if self.use_previous_action else 0)    # action_embedding
+            ), 
+            self._hidden_size,
+        )
+        
         self.print_v = False # True for debugging
         self.count = 0  # used in printing images in debug mode
         
@@ -741,10 +745,17 @@ class BaselineNetSemantic(Net):
             dim=-1)
         next_goal_linear = self.next_goal_map_encoder(next_goal_map_embed.unsqueeze(1))
 
+        # occupancy map prediction
+        occupancy_feats = self.occupancy_encoder(projection)
+        occupancy_linear = self.occupancy_linear(self.flatten(occupancy_feats))
+        if not self.use_occupancy:
+            occupancy_feats = occupancy_feats * 0
+            occupancy_linear = occupancy_linear * 0
+
         if self.use_previous_action:
             action_embedding = self.action_embedding(prev_actions).squeeze(1)
 
-        x = torch.cat((perception_embed, next_goal_linear, goal_embed, action_embedding), dim = 1)
+        x = torch.cat((perception_embed, next_goal_linear, occupancy_linear, goal_embed, action_embedding), dim = 1)
         x, rnn_hidden_states = self.state_encoder(x, rnn_hidden_states.permute(1, 0, 2), masks)
         
         ##forward pass specific - global map
@@ -830,7 +841,7 @@ class BaselineNetSemantic(Net):
             
             final_retrieval = torch.max(global_map, agent_view.permute(0, 2, 3, 1))
 
-        return x, rnn_hidden_states.permute(1, 0, 2), final_retrieval, sem_map_feats
+        return x, rnn_hidden_states.permute(1, 0, 2), final_retrieval, sem_map_feats, occupancy_feats
             
 class BaselineNetOracle(Net):
     r"""Network which passes the input image through CNN and concatenates

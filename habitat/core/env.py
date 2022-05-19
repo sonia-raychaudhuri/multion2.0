@@ -608,6 +608,9 @@ class Env:
             sem_map = patch[cropped_map_mid-ego_map_mid:cropped_map_mid+ego_map_mid+1, 
                             cropped_map_mid:cropped_map_mid+self.egocentric_map_size, 1]
             
+            occ_map = patch[cropped_map_mid-ego_map_mid:cropped_map_mid+ego_map_mid+1, 
+                            cropped_map_mid:cropped_map_mid+self.egocentric_map_size, 0]
+            
             """ Image.fromarray(
                 maps.colorize_topdown_map(
                     (sem_map-3+maps.MULTION_TOP_DOWN_MAP_START).astype(np.uint8)
@@ -616,6 +619,7 @@ class Env:
                 f"test_maps/{self.current_episode.episode_id}_new_0.png")
             self.count = 0 """
             observations["semMap"] = sem_map
+            observations["occMap"] = occ_map
             
         return observations
 
@@ -802,6 +806,9 @@ class Env:
             ego_map_mid = (self.egocentric_map_size//2)
             sem_map = patch[cropped_map_mid-ego_map_mid:cropped_map_mid+ego_map_mid+1, 
                             cropped_map_mid:cropped_map_mid+self.egocentric_map_size, 1]
+            occ_map = patch[cropped_map_mid-ego_map_mid:cropped_map_mid+ego_map_mid+1, 
+                            cropped_map_mid:cropped_map_mid+self.egocentric_map_size, 0]
+            
             """ Image.fromarray(
                 maps.colorize_topdown_map(
                     (sem_map-3+maps.MULTION_TOP_DOWN_MAP_START).astype(np.uint8)
@@ -810,6 +817,7 @@ class Env:
                 f"test_maps/{self.current_episode.episode_id}_new_{self.count}.png")
             self.count += 1 """
             observations["semMap"] = sem_map
+            observations["occMap"] = occ_map
             
         ##Terminates episode if wrong found is called
         if self.task.is_found_called == True and \

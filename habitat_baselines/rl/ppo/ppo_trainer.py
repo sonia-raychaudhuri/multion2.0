@@ -2136,9 +2136,9 @@ class PPOTrainerSemantic(PPOTrainer):
             is_double_buffered=ppo_cfg.use_double_buffered_sampler,
             action_shape=action_shape,
             discrete_actions=discrete_actions,
-            global_map_size=self.config.RL.MAPS.global_map_size,
-            global_map_depth=self.config.RL.MAPS.global_map_depth,
-            local_map_size=self.config.RL.MAPS.local_map_size
+            local_map_size=self.config.RL.MAPS.local_map_size,
+            egocentric_map_size=self.config.RL.MAPS.egocentric_map_size,
+            num_classes=self.config.RL.MAPS.num_classes,
         )
         self.rollouts.to(self.device)
 
@@ -2241,6 +2241,7 @@ class PPOTrainerSemantic(PPOTrainer):
             value_loss_coef=ppo_cfg.value_loss_coef,
             entropy_coef=ppo_cfg.entropy_coef,
             semantic_map_loss_coef=ppo_cfg.semantic_map_loss_coef,
+            occupancy_map_loss_coef = ppo_cfg.occupancy_map_loss_coef,
             lr=ppo_cfg.lr,
             eps=ppo_cfg.eps,
             max_grad_norm=ppo_cfg.max_grad_norm,
@@ -2335,7 +2336,7 @@ class PPOTrainerSemantic(PPOTrainer):
 
         self.agent.train()
 
-        value_loss, action_loss, dist_entropy, semantic_map_loss = self.agent.update(
+        value_loss, action_loss, dist_entropy, semantic_map_loss, occupancy_map_loss = self.agent.update(
             self.rollouts
         )
 
@@ -2347,6 +2348,7 @@ class PPOTrainerSemantic(PPOTrainer):
             action_loss,
             dist_entropy,
             semantic_map_loss,
+            occupancy_map_loss
         )
 
     @rank0_only
@@ -2574,6 +2576,7 @@ class PPOTrainerSemantic(PPOTrainer):
                     action_loss,
                     dist_entropy,
                     semantic_map_loss,
+                    occupancy_map_loss
                 ) = self._update_agent()
 
                 if ppo_cfg.use_linear_lr_decay:
@@ -2585,6 +2588,7 @@ class PPOTrainerSemantic(PPOTrainer):
                         value_loss=value_loss,
                         action_loss=action_loss,
                         semantic_map_loss=semantic_map_loss,
+                        occupancy_map_loss=occupancy_map_loss,
                         entropy=dist_entropy,
                     ),
                     count_steps_delta,
