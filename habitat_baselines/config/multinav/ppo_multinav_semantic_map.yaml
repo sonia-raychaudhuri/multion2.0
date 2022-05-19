@@ -4,15 +4,15 @@ ENV_NAME: "NavRLEnv"
 SIMULATOR_GPU_ID: 0
 TORCH_GPU_ID: 0
 VIDEO_OPTION: []
-TENSORBOARD_DIR: "experiments/3on2.0/semantic/v2/loss_coeff_0.5/train"
-TENSORBOARD_DIR_EVAL: "experiments/3on2.0/semantic/v2/loss_coeff_0.5/eval"
-VIDEO_DIR: "experiments/3on2.0/semantic/v2/loss_coeff_0.5/eval/videos"
-TEST_EPISODE_COUNT: 1
-EVAL_CKPT_PATH_DIR: "experiments/3on2.0/semantic/v2/loss_coeff_0.5/checkpoints"
+TENSORBOARD_DIR: "experiments/1on2.0/semantic/train"
+TENSORBOARD_DIR_EVAL: "experiments/1on2.0/semantic/eval"
+VIDEO_DIR: "experiments/1on2.0/semantic/eval/videos"
+TEST_EPISODE_COUNT: 5
+EVAL_CKPT_PATH_DIR: "experiments/1on2.0/semantic/checkpoints"
 NUM_PROCESSES: 8
 NUM_ENVIRONMENTS: 8
 SENSORS: ["RGB_SENSOR", "DEPTH_SENSOR"]
-CHECKPOINT_FOLDER: "experiments/3on2.0/semantic/v2/loss_coeff_0.5/checkpoints"
+CHECKPOINT_FOLDER: "experiments/1on2.0/semantic/checkpoints"
 NUM_UPDATES: 300000
 LOG_INTERVAL: 1
 CHECKPOINT_INTERVAL: 500
@@ -35,7 +35,8 @@ RL:
     num_mini_batch: 4
     value_loss_coef: 0.5
     entropy_coef: 0.01
-    semantic_map_loss_coef: 0.2
+    semantic_map_loss_coef: 0.01
+    next_goal_map_loss_coef: 0.01
     lr: 2.5e-4
     eps: 1e-5
     max_grad_norm: 0.2
@@ -54,3 +55,6 @@ RL:
     global_map_depth: 32
     coordinate_min: -62.3241
     coordinate_max: 90.0399
+    USE_OCCUPANCY: False
+    linear_out: 512
+    num_classes: 15

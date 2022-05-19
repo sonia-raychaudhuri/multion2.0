@@ -193,6 +193,7 @@ class PPOSemantic(nn.Module):
         value_loss_coef,
         entropy_coef,
         semantic_map_loss_coef,
+        next_goal_map_loss_coef,
         occupancy_map_loss_coef,
         lr=None,
         eps=None,
@@ -212,6 +213,7 @@ class PPOSemantic(nn.Module):
         self.value_loss_coef = value_loss_coef
         self.entropy_coef = entropy_coef
         self.semantic_map_loss_coef = semantic_map_loss_coef
+        self.next_goal_map_loss_coef = next_goal_map_loss_coef
         self.occupancy_map_loss_coef = occupancy_map_loss_coef
 
         self.max_grad_norm = max_grad_norm
@@ -245,6 +247,7 @@ class PPOSemantic(nn.Module):
         action_loss_epoch = 0.0
         dist_entropy_epoch = 0.0
         semantic_map_loss_epoch = 0.0
+        next_goal_map_loss_epoch = 0.0
         occupancy_map_loss_epoch = 0.0
 
         for _e in range(self.ppo_epoch):
@@ -260,6 +263,7 @@ class PPOSemantic(nn.Module):
                     dist_entropy,
                     _,
                     semantic_map_loss,
+                    next_goal_map_loss,
                     occupancy_map_loss
                 ) = self._evaluate_actions(
                     batch["observations"],
@@ -304,6 +308,7 @@ class PPOSemantic(nn.Module):
                     + action_loss
                     - dist_entropy * self.entropy_coef
                     + semantic_map_loss * self.semantic_map_loss_coef
+                    + next_goal_map_loss * self.next_goal_map_loss_coef
                     + occupancy_map_loss * self.occupancy_map_loss_coef
                 )
 
@@ -319,6 +324,7 @@ class PPOSemantic(nn.Module):
                 action_loss_epoch += action_loss.item()
                 dist_entropy_epoch += dist_entropy.item()
                 semantic_map_loss_epoch += semantic_map_loss.item()
+                next_goal_map_loss_epoch += next_goal_map_loss.item()
                 occupancy_map_loss_epoch += occupancy_map_loss.item()
 
             profiling_wrapper.range_pop()  # PPO.update epoch
@@ -329,9 +335,11 @@ class PPOSemantic(nn.Module):
         action_loss_epoch /= num_updates
         dist_entropy_epoch /= num_updates
         semantic_map_loss_epoch /= num_updates
+        next_goal_map_loss_epoch /= num_updates
         occupancy_map_loss_epoch /= num_updates
 
-        return value_loss_epoch, action_loss_epoch, dist_entropy_epoch, semantic_map_loss_epoch, occupancy_map_loss_epoch
+        return (value_loss_epoch, action_loss_epoch, dist_entropy_epoch, 
+                semantic_map_loss_epoch, next_goal_map_loss_epoch, occupancy_map_loss_epoch)
 
     def _evaluate_actions(
         self, observations, rnn_hidden_states, global_map, prev_actions, masks, action

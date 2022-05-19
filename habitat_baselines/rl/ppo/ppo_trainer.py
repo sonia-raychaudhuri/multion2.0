@@ -2139,6 +2139,7 @@ class PPOTrainerSemantic(PPOTrainer):
             local_map_size=self.config.RL.MAPS.local_map_size,
             egocentric_map_size=self.config.RL.MAPS.egocentric_map_size,
             num_classes=self.config.RL.MAPS.num_classes,
+            global_map_depth=self.config.RL.MAPS.global_map_depth,
         )
         self.rollouts.to(self.device)
 
@@ -2241,6 +2242,7 @@ class PPOTrainerSemantic(PPOTrainer):
             value_loss_coef=ppo_cfg.value_loss_coef,
             entropy_coef=ppo_cfg.entropy_coef,
             semantic_map_loss_coef=ppo_cfg.semantic_map_loss_coef,
+            next_goal_map_loss_coef=ppo_cfg.next_goal_map_loss_coef,
             occupancy_map_loss_coef = ppo_cfg.occupancy_map_loss_coef,
             lr=ppo_cfg.lr,
             eps=ppo_cfg.eps,
@@ -2336,7 +2338,7 @@ class PPOTrainerSemantic(PPOTrainer):
 
         self.agent.train()
 
-        value_loss, action_loss, dist_entropy, semantic_map_loss, occupancy_map_loss = self.agent.update(
+        value_loss, action_loss, dist_entropy, semantic_map_loss, next_goal_map_loss, occupancy_map_loss = self.agent.update(
             self.rollouts
         )
 
@@ -2348,6 +2350,7 @@ class PPOTrainerSemantic(PPOTrainer):
             action_loss,
             dist_entropy,
             semantic_map_loss,
+            next_goal_map_loss,
             occupancy_map_loss
         )
 
@@ -2576,6 +2579,7 @@ class PPOTrainerSemantic(PPOTrainer):
                     action_loss,
                     dist_entropy,
                     semantic_map_loss,
+                    next_goal_map_loss,
                     occupancy_map_loss
                 ) = self._update_agent()
 
@@ -2588,6 +2592,7 @@ class PPOTrainerSemantic(PPOTrainer):
                         value_loss=value_loss,
                         action_loss=action_loss,
                         semantic_map_loss=semantic_map_loss,
+                        next_goal_map_loss=next_goal_map_loss,
                         occupancy_map_loss=occupancy_map_loss,
                         entropy=dist_entropy,
                     ),

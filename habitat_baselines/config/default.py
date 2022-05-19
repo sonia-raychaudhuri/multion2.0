@@ -90,6 +90,7 @@ _C.RL.PPO.num_mini_batch = 16
 _C.RL.PPO.value_loss_coef = 0.5
 _C.RL.PPO.obj_recog_loss_coef = 0.01
 _C.RL.PPO.semantic_map_loss_coef = 0.01
+_C.RL.PPO.next_goal_map_loss_coef = 0.01
 _C.RL.PPO.occupancy_map_loss_coef = 0.01
 _C.RL.PPO.entropy_coef = 0.01
 _C.RL.PPO.lr = 7e-4
@@ -186,6 +187,7 @@ _C.RL.MAPS.USE_OCC_IN_ORACLE_EGO = False
 _C.RL.MAPS.USE_ORACLE_IN_OBJ_RECOG = False
 _C.RL.MAPS.USE_OCCUPANCY = False
 _C.RL.MAPS.num_classes = 15
+_C.RL.MAPS.num_occ_classes = 5
 _C.RL.MAPS.linear_out = 512
 # -----------------------------------------------------------------------------
 # DECENTRALIZED DISTRIBUTED PROXIMAL POLICY OPTIMIZATION (DD-PPO)

@@ -525,6 +525,7 @@ class RolloutStorageSemantic:
         local_map_size:int = 51,
         egocentric_map_size:int = 13,
         num_classes:int = 15,
+        global_map_depth:int = 32,
     ):
         self.buffers = TensorDict()
         self.buffers["observations"] = TensorDict()
@@ -544,15 +545,22 @@ class RolloutStorageSemantic:
         self.buffers["observations"]["semMap"] = torch.zeros(
                 numsteps+1, 
                 num_envs,
-                egocentric_map_size,
-                egocentric_map_size
+                local_map_size,
+                local_map_size
+            )
+        
+        self.buffers["observations"]["nextGoalMap"] = torch.zeros(
+                numsteps+1, 
+                num_envs,
+                local_map_size,
+                local_map_size
             )
 
         self.buffers["observations"]["occMap"] = torch.zeros(
                 numsteps+1, 
                 num_envs,
-                egocentric_map_size,
-                egocentric_map_size
+                local_map_size,
+                local_map_size
             )
 
         # Stores cropped and rotated map
@@ -561,7 +569,7 @@ class RolloutStorageSemantic:
             num_envs,
             local_map_size,
             local_map_size,
-            num_classes,
+            global_map_depth,
         )
         
         self.buffers["recurrent_hidden_states"] = torch.zeros(

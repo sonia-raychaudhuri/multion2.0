@@ -144,8 +144,8 @@ class Env:
         self._episode_over = False
         self._map_resolution = 300
         self.meters_per_pixel = self._config.TASK["MAP_RESOLUTION"] if "MAP_RESOLUTION" in self._config.TASK else 0.5
-        self.cropped_map_size = self._config.TASK["CROP_MAP_SIZE"] if "CROP_MAP_SIZE" in self._config.TASK else 80
-        self.egocentric_map_size = self._config.TASK["EGO_MAP_SIZE"] if "EGO_MAP_SIZE" in self._config.TASK else 13
+        self.cropped_map_size = self._config.TASK["CROP_MAP_SIZE"] if "CROP_MAP_SIZE" in self._config.TASK else 100
+        self.egocentric_map_size = self._config.TASK["EGO_MAP_SIZE"] if "EGO_MAP_SIZE" in self._config.TASK else 51
         if config.TRAINER_NAME in ["oracle", "oracle-ego", "semantic"]:
             self.mapCache = {}
             """ with open(config.TASK.ORACLE_MAP_PATH, 'rb') as handle:
@@ -606,10 +606,10 @@ class Env:
             # agent is on bottom center
             ego_map_mid = (self.egocentric_map_size//2)
             sem_map = patch[cropped_map_mid-ego_map_mid:cropped_map_mid+ego_map_mid+1, 
-                            cropped_map_mid:cropped_map_mid+self.egocentric_map_size, 1]
+                            cropped_map_mid-1:cropped_map_mid+self.egocentric_map_size, 1]
             
             occ_map = patch[cropped_map_mid-ego_map_mid:cropped_map_mid+ego_map_mid+1, 
-                            cropped_map_mid:cropped_map_mid+self.egocentric_map_size, 0]
+                            cropped_map_mid-1:cropped_map_mid+self.egocentric_map_size, 0]
             
             """ Image.fromarray(
                 maps.colorize_topdown_map(
@@ -619,6 +619,7 @@ class Env:
                 f"test_maps/{self.current_episode.episode_id}_new_0.png")
             self.count = 0 """
             observations["semMap"] = sem_map
+            observations["nextGoalMap"] = ((sem_map-3) == observations['multiobjectgoal'])
             observations["occMap"] = occ_map
             
         return observations
@@ -805,9 +806,10 @@ class Env:
             # agent is on bottom center
             ego_map_mid = (self.egocentric_map_size//2)
             sem_map = patch[cropped_map_mid-ego_map_mid:cropped_map_mid+ego_map_mid+1, 
-                            cropped_map_mid:cropped_map_mid+self.egocentric_map_size, 1]
+                            cropped_map_mid-1:cropped_map_mid+self.egocentric_map_size, 1]
+            
             occ_map = patch[cropped_map_mid-ego_map_mid:cropped_map_mid+ego_map_mid+1, 
-                            cropped_map_mid:cropped_map_mid+self.egocentric_map_size, 0]
+                            cropped_map_mid-1:cropped_map_mid+self.egocentric_map_size, 0]
             
             """ Image.fromarray(
                 maps.colorize_topdown_map(
@@ -817,6 +819,7 @@ class Env:
                 f"test_maps/{self.current_episode.episode_id}_new_{self.count}.png")
             self.count += 1 """
             observations["semMap"] = sem_map
+            observations["nextGoalMap"] = ((sem_map-3) == observations['multiobjectgoal'])
             observations["occMap"] = occ_map
             
         ##Terminates episode if wrong found is called
