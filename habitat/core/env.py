@@ -143,13 +143,15 @@ class Env:
         self._episode_start_time: Optional[float] = None
         self._episode_over = False
         self._map_resolution = 300
-        self.meters_per_pixel = self._config.TASK["MAP_RESOLUTION"] if "MAP_RESOLUTION" in self._config.TASK else 0.5
+        self.meters_per_pixel = self._config.TASK["MAP_RESOLUTION"] if "MAP_RESOLUTION" in self._config.TASK else 0.3
         self.cropped_map_size = self._config.TASK["CROP_MAP_SIZE"] if "CROP_MAP_SIZE" in self._config.TASK else 100
         self.egocentric_map_size = self._config.TASK["EGO_MAP_SIZE"] if "EGO_MAP_SIZE" in self._config.TASK else 51
+        self.cache_map = self._config.TASK["CACHE_MAP"] if "CACHE_MAP" in self._config.TASK else True
         if config.TRAINER_NAME in ["oracle", "oracle-ego", "semantic"]:
             self.mapCache = {}
-            """ with open(config.TASK.ORACLE_MAP_PATH, 'rb') as handle:
-                self.mapCache = pickle.load(handle) """
+            # if self.old_map:
+            #     with open(config.TASK.ORACLE_MAP_PATH, 'rb') as handle:
+            #         self.mapCache = pickle.load(handle)
         if config.TRAINER_NAME == "oracle-ego":
             for x,y in self.mapCache.items():
                 self.mapCache[x] += 1
@@ -312,9 +314,12 @@ class Env:
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego", "obj-recog", "semantic"]:
             #self.currMap = np.copy(self.mapCache[f"../multiON/{self.current_episode.scene_id}"])
             agent_vertical_pos = str(round(observations["agent_position"][1],2))
-            if (self.current_episode.scene_id in self.mapCache and 
+            if self.cache_map and (self.current_episode.scene_id in self.mapCache and 
                     agent_vertical_pos in self.mapCache[self.current_episode.scene_id]):
-                self.currMap = self.mapCache[self.current_episode.scene_id][agent_vertical_pos].copy()
+                top_down_map = (self.mapCache[self.current_episode.scene_id][agent_vertical_pos]).copy()
+                tmp_map = np.zeros((top_down_map.shape[0],top_down_map.shape[1],3))
+                tmp_map[:top_down_map.shape[0], :top_down_map.shape[1], 0] = top_down_map
+                self.currMap = tmp_map
             else:
                 # topdown map obtained from habitat has 0 if occupied, 1 if unoccupied
                 top_down_map = maps.get_topdown_map_from_sim(
@@ -341,13 +346,13 @@ class Env:
                 if self._config.TRAINER_NAME in ["oracle-ego", "semantic"]:
                     top_down_map[range_x[0] : range_x[1], range_y[0] : range_y[1]] += 1
                 
-                tmp_map = np.zeros((top_down_map.shape[0],top_down_map.shape[1],3))
-                tmp_map[:top_down_map.shape[0], :top_down_map.shape[1], 0] = top_down_map
-                
                 if self.current_episode.scene_id not in self.mapCache:
                     self.mapCache[self.current_episode.scene_id] = {}
-                self.mapCache[self.current_episode.scene_id][agent_vertical_pos] = tmp_map
-                self.currMap = tmp_map.copy()
+                self.mapCache[self.current_episode.scene_id][agent_vertical_pos] = top_down_map
+                
+                tmp_map = np.zeros((top_down_map.shape[0],top_down_map.shape[1],3))
+                tmp_map[:top_down_map.shape[0], :top_down_map.shape[1], 0] = top_down_map.copy()
+                self.currMap = tmp_map
                 
             #self.task.occMap = self.currMap[:,:,0]
             self.task.sceneMap = self.currMap[:,:,0]
