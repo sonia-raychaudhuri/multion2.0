@@ -2350,9 +2350,7 @@ class PPOTrainerSemantic(PPOTrainer):
             value_loss,
             action_loss,
             dist_entropy,
-            semantic_map_loss,
             next_goal_map_loss,
-            occupancy_map_loss
         )
 
     @rank0_only
@@ -2579,9 +2577,7 @@ class PPOTrainerSemantic(PPOTrainer):
                     value_loss,
                     action_loss,
                     dist_entropy,
-                    semantic_map_loss,
                     next_goal_map_loss,
-                    occupancy_map_loss
                 ) = self._update_agent()
 
                 if ppo_cfg.use_linear_lr_decay:
@@ -2592,9 +2588,7 @@ class PPOTrainerSemantic(PPOTrainer):
                     dict(
                         value_loss=value_loss,
                         action_loss=action_loss,
-                        semantic_map_loss=semantic_map_loss,
                         next_goal_map_loss=next_goal_map_loss,
-                        occupancy_map_loss=occupancy_map_loss,
                         entropy=dist_entropy,
                     ),
                     count_steps_delta,
@@ -2765,9 +2759,7 @@ class PPOTrainerSemantic(PPOTrainer):
                     _,
                     test_recurrent_hidden_states,
                     test_global_map,
-                    semantic_map, 
                     next_goal_map, 
-                    occupancy_map
                 ) = self.actor_critic.act(
                     batch,
                     test_recurrent_hidden_states,
@@ -2847,7 +2839,6 @@ class PPOTrainerSemantic(PPOTrainer):
                             info=infos[i],
                             action=actions[i],
                             global_map=test_global_map[i],
-                            semantic_map=semantic_map[i], 
                             next_goal_map=next_goal_map[i],
                         )
                         txt_to_show = ('Action: '+ str(actions[i].item()) + 
@@ -2883,7 +2874,6 @@ class PPOTrainerSemantic(PPOTrainer):
                         info=infos[i],
                         action=actions[i],
                         global_map=test_global_map[i],
-                        semantic_map=semantic_map[i], 
                         next_goal_map=next_goal_map[i],
                     )
                     txt_to_show = ('Action: '+ str(actions[i].item()) + 

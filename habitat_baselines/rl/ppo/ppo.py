@@ -262,9 +262,7 @@ class PPOSemantic(nn.Module):
                     action_log_probs,
                     dist_entropy,
                     _,
-                    semantic_map_loss,
                     next_goal_map_loss,
-                    occupancy_map_loss
                 ) = self._evaluate_actions(
                     batch["observations"],
                     batch["recurrent_hidden_states"],
@@ -307,9 +305,7 @@ class PPOSemantic(nn.Module):
                     value_loss * self.value_loss_coef
                     + action_loss
                     - dist_entropy * self.entropy_coef
-                    + semantic_map_loss * self.semantic_map_loss_coef
                     + next_goal_map_loss * self.next_goal_map_loss_coef
-                    + occupancy_map_loss * self.occupancy_map_loss_coef
                 )
 
                 self.before_backward(total_loss)
@@ -323,9 +319,7 @@ class PPOSemantic(nn.Module):
                 value_loss_epoch += value_loss.item()
                 action_loss_epoch += action_loss.item()
                 dist_entropy_epoch += dist_entropy.item()
-                semantic_map_loss_epoch += semantic_map_loss.item()
                 next_goal_map_loss_epoch += next_goal_map_loss.item()
-                occupancy_map_loss_epoch += occupancy_map_loss.item()
 
             profiling_wrapper.range_pop()  # PPO.update epoch
 
@@ -334,9 +328,7 @@ class PPOSemantic(nn.Module):
         value_loss_epoch /= num_updates
         action_loss_epoch /= num_updates
         dist_entropy_epoch /= num_updates
-        semantic_map_loss_epoch /= num_updates
         next_goal_map_loss_epoch /= num_updates
-        occupancy_map_loss_epoch /= num_updates
 
         return (value_loss_epoch, action_loss_epoch, dist_entropy_epoch, 
                 semantic_map_loss_epoch, next_goal_map_loss_epoch, occupancy_map_loss_epoch)
