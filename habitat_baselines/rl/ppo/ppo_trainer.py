@@ -23,7 +23,7 @@ from torch.optim.lr_scheduler import LambdaLR
 from gym import spaces
 
 from habitat import Config, logger, VectorEnv
-from habitat.utils.visualizations.utils import observations_to_image
+from habitat.utils.visualizations.utils import observations_to_image, append_text_to_image
 from habitat_baselines.common.base_trainer import (
     BaseRLTrainerNonOracle, BaseRLTrainerOracle, 
     BaseRLTrainer)
@@ -78,6 +78,7 @@ from habitat_baselines.common.obs_transformers import (
 )
 from habitat.utils import profiling_wrapper
 from habitat_baselines.utils.render_wrapper import overlay_frame
+from habitat.utils.visualizations import maps
 
 @baseline_registry.register_trainer(name="ddppo")
 @baseline_registry.register_trainer(name="ppo")
@@ -2763,7 +2764,10 @@ class PPOTrainerSemantic(PPOTrainer):
                     actions,
                     _,
                     test_recurrent_hidden_states,
-                    test_global_map
+                    test_global_map,
+                    semantic_map, 
+                    next_goal_map, 
+                    occupancy_map
                 ) = self.actor_critic.act(
                     batch,
                     test_recurrent_hidden_states,
@@ -2838,6 +2842,26 @@ class PPOTrainerSemantic(PPOTrainer):
                     ] = episode_stats
 
                     if len(self.config.VIDEO_OPTION) > 0:
+                        frame = observations_to_image(
+                            {k: v[i] for k, v in batch.items()}, 
+                            info=infos[i],
+                            action=actions[i],
+                            global_map=test_global_map[i],
+                            semantic_map=semantic_map[i], 
+                            next_goal_map=next_goal_map[i],
+                        )
+                        txt_to_show = ('Action: '+ str(actions[i].item()) + 
+                                    '; Dist_to_multi_goal:' + str(round(infos[i]['distance_to_multi_goal'],2)) + 
+                                    '; Dist_to_curr_goal:' + str(round(infos[i]['distance_to_currgoal'],2)) + 
+                                    '; Current Goal:' + str(observations[i]['multiobjectgoal'][0]) +
+                                    '; Success:' + str(infos[i]['success']) +
+                                    '; Sub_success:' + str(infos[i]['sub_success']) +
+                                    '; Progress:' + str(round(infos[i]['progress'],2)))
+                        frame = append_text_to_image(frame, txt_to_show)
+                        if self.config.VIDEO_RENDER_ALL_INFO:
+                            frame = overlay_frame(frame, infos[i])
+
+                        rgb_frames[i].append(frame)
                         generate_video(
                             video_option=self.config.VIDEO_OPTION,
                             video_dir=self.config.VIDEO_DIR,
@@ -2854,10 +2878,23 @@ class PPOTrainerSemantic(PPOTrainer):
 
                 # episode continues
                 elif len(self.config.VIDEO_OPTION) > 0:
-                    # TODO move normalization / channel changing out of the policy and undo it here
                     frame = observations_to_image(
-                        {k: v[i] for k, v in batch.items()}, info=infos[i]
+                        {k: v[i] for k, v in batch.items()}, 
+                        info=infos[i],
+                        action=actions[i],
+                        global_map=test_global_map[i],
+                        semantic_map=semantic_map[i], 
+                        next_goal_map=next_goal_map[i],
                     )
+                    txt_to_show = ('Action: '+ str(actions[i].item()) + 
+                                '; Dist_to_multi_goal:' + str(round(infos[i]['distance_to_multi_goal'],2)) + 
+                                '; Dist_to_curr_goal:' + str(round(infos[i]['distance_to_currgoal'],2)) + 
+                                '; Current Goal:' + str(observations[i]['multiobjectgoal'][0]) +
+                                '; Success:' + str(infos[i]['success']) +
+                                '; Sub_success:' + str(infos[i]['sub_success']) +
+                                '; Progress:' + str(round(infos[i]['progress'],2)))
+                    frame = append_text_to_image(frame, txt_to_show)
+                    
                     if self.config.VIDEO_RENDER_ALL_INFO:
                         frame = overlay_frame(frame, infos[i])
 
@@ -5202,6 +5239,21 @@ class PPOTrainerOracleMap(PPOTrainer):
                         ] = infos[i]["raw_metrics"]
 
                     if len(self.config.VIDEO_OPTION) > 0:
+                        frame = observations_to_image(
+                            {k: v[i] for k, v in batch.items()}, info=infos[i]
+                        )
+                        txt_to_show = ('Action: '+ str(actions[i].item()) + 
+                                        '; Dist_to_multi_goal:' + str(round(infos[i]['distance_to_multi_goal'],2)) + 
+                                        '; Dist_to_curr_goal:' + str(round(infos[i]['distance_to_currgoal'],2)) + 
+                                        '; Current Goal:' + str(observations[i]['multiobjectgoal'][0]) +
+                                        '; Success:' + str(infos[i]['success']) +
+                                        '; Sub_success:' + str(infos[i]['sub_success']) +
+                                        '; Progress:' + str(round(infos[i]['progress'],2)))
+                        frame = append_text_to_image(frame, txt_to_show)
+                        if self.config.VIDEO_RENDER_ALL_INFO:
+                            frame = overlay_frame(frame, infos[i])
+
+                        rgb_frames[i].append(frame)
                         generate_video(
                             video_option=self.config.VIDEO_OPTION,
                             video_dir=self.config.VIDEO_DIR,
@@ -5218,10 +5270,17 @@ class PPOTrainerOracleMap(PPOTrainer):
 
                 # episode continues
                 elif len(self.config.VIDEO_OPTION) > 0:
-                    # TODO move normalization / channel changing out of the policy and undo it here
                     frame = observations_to_image(
                         {k: v[i] for k, v in batch.items()}, info=infos[i]
                     )
+                    txt_to_show = ('Action: '+ str(actions[i].item()) + 
+                                    '; Dist_to_multi_goal:' + str(round(infos[i]['distance_to_multi_goal'],2)) + 
+                                    '; Dist_to_curr_goal:' + str(round(infos[i]['distance_to_currgoal'],2)) + 
+                                    '; Current Goal:' + str(observations[i]['multiobjectgoal'][0]) +
+                                    '; Success:' + str(infos[i]['success']) +
+                                    '; Sub_success:' + str(infos[i]['sub_success']) +
+                                    '; Progress:' + str(round(infos[i]['progress'],2)))
+                    frame = append_text_to_image(frame, txt_to_show)
                     if self.config.VIDEO_RENDER_ALL_INFO:
                         frame = overlay_frame(frame, infos[i])
 

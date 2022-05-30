@@ -170,7 +170,7 @@ class PolicySemantic(nn.Module):
         masks,
         deterministic=False,
     ):
-        features, rnn_hidden_states, global_map, _, _, _ = self.net(
+        features, rnn_hidden_states, global_map, semantic_map, next_goal_map, occupancy_map = self.net(
             observations, rnn_hidden_states, global_map, prev_actions, masks
         )
 
@@ -184,7 +184,8 @@ class PolicySemantic(nn.Module):
 
         action_log_probs = distribution.log_probs(action)
 
-        return value, action, action_log_probs, rnn_hidden_states, global_map
+        return (value, action, action_log_probs, rnn_hidden_states, 
+                global_map, semantic_map, next_goal_map, occupancy_map)
 
     def get_value(self, observations, rnn_hidden_states, global_map, prev_actions, masks):
         features, _, _, _, _, _ = self.net(
@@ -993,9 +994,12 @@ class BaselineNetOracleMap(Net):
 
         self.visual_encoder = RGBCNNOracle(observation_space, 512)
         if agent_type == "oracle":
-            _n_input_map = 32
+            _n_input_map = 32 #48
             self.occupancy_embedding = nn.Embedding(3, 16)
             self.object_embedding = nn.Embedding(9, 16)
+            self.curr_goal_embedding = nn.Embedding(2, 16)
+            if self.config.RL.MAPS.ALL_GOAL_IND:
+                _n_input_map += 16
             if self.config.TASK_CONFIG.TASK.INCLUDE_DISTRACTORS and self.config.RL.MAPS.INCLUDE_DISTRACTOR_EMBED:
                 self.distractor_embedding = nn.Embedding(9, 16)
                 _n_input_map += 16
@@ -1066,7 +1070,10 @@ class BaselineNetOracleMap(Net):
                 obj_cat_map = global_map[:,:,:,1]
                 distrIndexOffset = 1 if self.agent_type == "oracle" else 2 # to match categories in oracle map
                 goal_map = (obj_cat_map == (target_encoding + distrIndexOffset).unsqueeze(1)).type(torch.LongTensor)
-                global_map_embedding.append(self.object_embedding(goal_map.to(self.device).view(-1)).view(bs, 50, 50, -1))
+                #global_map_embedding.append(self.object_embedding(goal_map.to(self.device).view(-1)).view(bs, 50, 50, -1))
+                global_map_embedding.append(self.curr_goal_embedding(goal_map.to(self.device).view(-1)).view(bs, 50, 50, -1))
+                if self.config.RL.MAPS.ALL_GOAL_IND:
+                    global_map_embedding.append(self.object_embedding(obj_cat_map.type(torch.LongTensor).to(self.device).view(-1)).view(bs, 50, 50, -1))
             else:
                 global_map_embedding.append(self.object_embedding(global_map[:, :, :, 1].type(torch.LongTensor).to(self.device).view(-1)).view(bs, 50, 50, -1))
             
