@@ -207,8 +207,8 @@ class PolicySemantic(nn.Module):
         action_log_probs = distribution.log_probs(action)
         distribution_entropy = distribution.entropy().mean()
 
-        mse_loss = nn.MSELoss(reduction='mean')
-        next_goal_map_loss = mse_loss(next_goal_map, observations['nextGoalMap'])
+        loss = nn.CrossEntropyLoss(reduction='mean')
+        next_goal_map_loss = loss(next_goal_map, observations['nextGoalMap'].long())
         
         return (value, action_log_probs, distribution_entropy, rnn_hidden_states, 
                 next_goal_map_loss)
@@ -672,9 +672,9 @@ class BaselineNetSemantic(Net):
                                               num_classes=object_category_embedding_size)
         self.global_map_encoder_linear = MapCNN(self.local_map_size, self.linear_out, 
                                                 "non-oracle",
-                                                (self.global_map_depth + self.num_classes))
+                                                (self.global_map_depth + 2))
         
-        self.sem_map_decoder = SemmapDecoder(self.global_map_depth, self.num_classes)
+        self.sem_map_decoder = SemmapDecoder(self.global_map_depth, 2)
 
         # Semantic Map Prediction
         self.sem_map_encoder = SemanticMapCNN(map_size=self.local_map_size, 
