@@ -794,7 +794,7 @@ class BaselineNetSemantic(Net):
 
             # concat and linearize
             global_map_embedding = torch.cat((global_map_feats, next_goal_map), dim=1)
-            global_map_embed = self.global_map_encoder_linear(global_map_embedding.permute(0, 2, 3, 1))
+            global_map_embed = self.global_map_encoder_linear(global_map_embedding.contiguous().permute(0, 2, 3, 1))
 
             if self.use_previous_action:
                 action_embedding = self.action_embedding(prev_actions).squeeze(1)
@@ -821,7 +821,7 @@ class BaselineNetSemantic(Net):
 
             # concat and linearize
             global_map_embedding = torch.cat((global_map_feats, next_goal_map), dim=1)
-            global_map_embed = self.global_map_encoder_linear(global_map_embedding.permute(0, 2, 3, 1))
+            global_map_embed = self.global_map_encoder_linear(global_map_embedding.contiguous().permute(0, 2, 3, 1))
 
             if self.use_previous_action:
                 action_embedding = self.action_embedding(prev_actions).squeeze(1)
