@@ -623,9 +623,9 @@ class Env:
                 ).save(
                 f"test_maps/{self.current_episode.episode_id}_new_0.png")
             self.count = 0 """
-            observations["semMap"] = sem_map
+            #observations["semMap"] = sem_map
             observations["nextGoalMap"] = ((sem_map-3) == observations['multiobjectgoal'])
-            observations["occMap"] = occ_map
+            #observations["occMap"] = occ_map
             
         return observations
 
@@ -823,9 +823,9 @@ class Env:
                 ).save(
                 f"test_maps/{self.current_episode.episode_id}_new_{self.count}.png")
             self.count += 1 """
-            observations["semMap"] = sem_map
+            #observations["semMap"] = sem_map
             observations["nextGoalMap"] = ((sem_map-3) == observations['multiobjectgoal'])
-            observations["occMap"] = occ_map
+            #observations["occMap"] = occ_map
             
         ##Terminates episode if wrong found is called
         if self.task.is_found_called == True and \

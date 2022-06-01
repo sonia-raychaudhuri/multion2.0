@@ -542,12 +542,12 @@ class RolloutStorageSemantic:
                 )
             )
 
-        self.buffers["observations"]["semMap"] = torch.zeros(
+        """ self.buffers["observations"]["semMap"] = torch.zeros(
                 numsteps+1, 
                 num_envs,
                 local_map_size,
                 local_map_size
-            )
+            ) """
         
         self.buffers["observations"]["nextGoalMap"] = torch.zeros(
                 numsteps+1, 
@@ -556,12 +556,12 @@ class RolloutStorageSemantic:
                 local_map_size
             )
 
-        self.buffers["observations"]["occMap"] = torch.zeros(
+        """ self.buffers["observations"]["occMap"] = torch.zeros(
                 numsteps+1, 
                 num_envs,
                 local_map_size,
                 local_map_size
-            )
+            ) """
 
         # Stores cropped and rotated map
         self.buffers["global_map"] = torch.zeros(
