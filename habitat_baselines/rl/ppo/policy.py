@@ -15,6 +15,7 @@ from habitat_baselines.rl.models.rnn_state_encoder import RNNStateEncoder
 from habitat_baselines.rl.models.simple_cnn import (
     RGBCNNNonOracle, RGBCNNOracle, MapCNN, SimpleCNN, 
     SemanticMapCNN, SemmapDecoder)
+from habitat_baselines.rl.models.resnet_encoders import VisualRednetEncoder
 from habitat_baselines.rl.models.projection import Projection
 from habitat.utils.visualizations import maps
 from PIL import Image
@@ -643,7 +644,8 @@ class BaselineNetSemantic(Net):
         self.linear_out = self.config.RL.MAPS.linear_out
         self.use_occupancy = self.config.RL.MAPS.USE_OCCUPANCY
 
-        self.visual_encoder = RGBCNNNonOracle(observation_space, hidden_size)
+        #self.visual_encoder = RGBCNNNonOracle(observation_space, hidden_size) #3CONV
+        self.visual_encoder = VisualRednetEncoder(observation_space, hidden_size, device)
         
         # Map projection
         self.projection = Projection(self.egocentric_map_size, self.global_map_size, 
@@ -652,7 +654,7 @@ class BaselineNetSemantic(Net):
         self.to_grid = to_grid(self.global_map_size, self.coordinate_min, self.coordinate_max)
         self.rotate_tensor = RotateTensor(device)
 
-        self.image_features_linear = nn.Linear(self.global_map_depth * 28 * 28, self.linear_out)
+        self.image_features_linear = nn.Linear(self.global_map_depth * 25 * 25, self.linear_out)
 
         self.flatten = Flatten()
 
@@ -674,32 +676,9 @@ class BaselineNetSemantic(Net):
                                                 "non-oracle",
                                                 (self.global_map_depth + 2))
         
-        self.sem_map_decoder = SemmapDecoder(self.global_map_depth, 2)
+        self.sem_map_decoder = SemmapDecoder(1, 2)
 
-        # Semantic Map Prediction
-        self.sem_map_encoder = SemanticMapCNN(map_size=self.local_map_size, 
-                                              input_channels=self.global_map_depth, 
-                                              num_classes=self.num_classes)
         self.object_embedding = nn.Embedding(self.num_classes, object_category_embedding_size)
-        
-        self.next_goal_map_encoder = nn.Sequential(
-            SemanticMapCNN(map_size=self.local_map_size, 
-                            input_channels=1, 
-                            num_classes=1),
-            nn.ReLU(True),
-            Flatten(),
-            nn.Linear(
-                self.local_map_size * self.local_map_size, 
-                self.linear_out)
-            )
-        
-        self.occupancy_encoder = SemanticMapCNN(map_size=self.local_map_size, 
-                                            input_channels=self.global_map_depth, 
-                                            num_classes=self.num_occ_classes)
-        self.occupancy_linear = nn.Linear(
-                                    self.local_map_size * self.local_map_size * self.num_occ_classes, 
-                                    self.linear_out
-                                )
         
         self.state_encoder = RNNStateEncoder(
             ((0 if self.is_blind 
@@ -789,8 +768,14 @@ class BaselineNetSemantic(Net):
             # global map encoder
             global_map_feats = self.global_map_encoder(final_retrieval)
 
+            # derive next goal location
+            next_goal_map_embed = torch.nn.functional.cosine_similarity(
+                global_map_feats.permute(0, 2, 3, 1),
+                goal_embed.unsqueeze(1).unsqueeze(1),
+                dim=-1)
+
             # next goal map
-            next_goal_map = self.sem_map_decoder(global_map_feats)
+            next_goal_map = self.sem_map_decoder(next_goal_map_embed.unsqueeze(1))
 
             # concat and linearize
             global_map_embedding = torch.cat((global_map_feats, next_goal_map), dim=1)
@@ -815,9 +800,15 @@ class BaselineNetSemantic(Net):
 
             # global map encoder
             global_map_feats = self.global_map_encoder(final_retrieval.permute(0,3,1,2))
+            
+            # derive next goal location
+            next_goal_map_embed = torch.nn.functional.cosine_similarity(
+                global_map_feats.permute(0, 2, 3, 1),
+                goal_embed.unsqueeze(1).unsqueeze(1),
+                dim=-1)
 
             # next goal map
-            next_goal_map = self.sem_map_decoder(global_map_feats)
+            next_goal_map = self.sem_map_decoder(next_goal_map_embed.unsqueeze(1))
 
             # concat and linearize
             global_map_embedding = torch.cat((global_map_feats, next_goal_map), dim=1)
