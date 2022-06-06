@@ -688,9 +688,128 @@ class SemmapDecoder(nn.Module):
                                        nn.Conv2d(48, n_obj_classes,
                                                  kernel_size=1, stride=1,
                                                  padding=0, bias=True),
+                                       nn.ReLU(inplace=True)
                                       )
 
     def forward(self, memory):
         l1 = self.layer(memory)
         out_obj = self.obj_layer(l1)
         return l1, out_obj
+    
+class SimpleRgbCNN(nn.Module):
+    r"""A Simple 3-Conv CNN followed by a fully connected layer
+
+    Takes in observations and produces an embedding of the rgb component
+
+    Args:
+        observation_space: The observation_space of the agent
+        output_size: The size of the embedding vector
+    """
+
+    def __init__(self, observation_space, output_size):
+        super().__init__()
+        self._n_input_rgb = observation_space.spaces["rgb"].shape
+
+        # kernel size for different CNN layers
+        self._cnn_layers_kernel_size = [(8, 8), (4, 4), (3, 3)]
+
+        # strides for different CNN layers
+        self._cnn_layers_stride = [(4, 4), (2, 2), (1, 1)]
+
+        self.cnn_dims = np.array(
+            observation_space.spaces["rgb"].shape[:2], dtype=np.float32
+        )
+
+        for kernel_size, stride in zip(
+            self._cnn_layers_kernel_size, self._cnn_layers_stride
+        ):
+            self.cnn_dims = self._conv_output_dim(
+                dimension=self.cnn_dims,
+                padding=np.array([0, 0], dtype=np.float32),
+                dilation=np.array([1, 1], dtype=np.float32),
+                kernel_size=np.array(kernel_size, dtype=np.float32),
+                stride=np.array(stride, dtype=np.float32),
+            )
+
+        self.cnn = nn.Sequential(
+            nn.Conv2d(
+                in_channels=self._n_input_rgb[2],
+                out_channels=32,
+                kernel_size=self._cnn_layers_kernel_size[0],
+                stride=self._cnn_layers_stride[0],
+            ),
+            nn.ReLU(True),
+            nn.Conv2d(
+                in_channels=32,
+                out_channels=64,
+                kernel_size=self._cnn_layers_kernel_size[1],
+                stride=self._cnn_layers_stride[1],
+            ),
+            nn.ReLU(True),
+            nn.Conv2d(
+                in_channels=64,
+                out_channels=32,
+                kernel_size=self._cnn_layers_kernel_size[2],
+                stride=self._cnn_layers_stride[2],
+            ),
+            nn.ReLU(True),
+        )
+
+        self.layer_init()
+
+    def _conv_output_dim(
+        self, dimension, padding, dilation, kernel_size, stride
+    ):
+        r"""Calculates the output height and width based on the input
+        height and width to the convolution layer.
+
+        ref: https://pytorch.org/docs/master/nn.html#torch.nn.Conv2d
+        """
+        assert len(dimension) == 2
+        out_dimension = []
+        for i in range(len(dimension)):
+            out_dimension.append(
+                int(
+                    np.floor(
+                        (
+                            (
+                                dimension[i]
+                                + 2 * padding[i]
+                                - dilation[i] * (kernel_size[i] - 1)
+                                - 1
+                            )
+                            / stride[i]
+                        )
+                        + 1
+                    )
+                )
+            )
+        return tuple(out_dimension)
+
+    def layer_init(self):
+        for layer in self.cnn:
+            if isinstance(layer, (nn.Conv2d, nn.Linear)):
+                nn.init.kaiming_normal_(
+                    layer.weight, nn.init.calculate_gain("relu")
+                )
+                if layer.bias is not None:
+                    nn.init.constant_(layer.bias, val=0)
+
+    @property
+    def is_blind(self):
+        return self._n_input_rgb == 0
+
+    def forward(self, observations):
+
+        rgb_observations = observations["rgb"]
+        # permute tensor to dimension [BATCH x CHANNEL x HEIGHT X WIDTH]
+        rgb_observations = rgb_observations.permute(0, 3, 1, 2)
+        rgb_observations = rgb_observations / 255.0  # normalize RGB
+
+        return self.cnn(rgb_observations)
+    
+    @property
+    def _output_size(self):
+        self.cnn_dims
+        s = self.cnn(torch.rand(self._n_input_rgb).unsqueeze(0).permute(0,3,1,2)).data.shape
+        return s

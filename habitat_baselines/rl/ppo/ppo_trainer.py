@@ -2339,7 +2339,7 @@ class PPOTrainerSemantic(PPOTrainer):
 
         self.agent.train()
 
-        value_loss, action_loss, dist_entropy, semantic_map_loss, next_goal_map_loss, occupancy_map_loss, total_loss = self.agent.update(
+        value_loss, action_loss, dist_entropy, semantic_map_loss, next_goal_map_loss, occupancy_map_loss = self.agent.update(
             self.rollouts
         )
 
@@ -2351,8 +2351,7 @@ class PPOTrainerSemantic(PPOTrainer):
             action_loss,
             dist_entropy,
             semantic_map_loss,
-            next_goal_map_loss,
-            total_loss
+            next_goal_map_loss
         )
 
     @rank0_only
@@ -2580,8 +2579,7 @@ class PPOTrainerSemantic(PPOTrainer):
                     action_loss,
                     dist_entropy,
                     semantic_map_loss,
-                    next_goal_map_loss,
-                    total_loss
+                    next_goal_map_loss
                 ) = self._update_agent()
 
                 if ppo_cfg.use_linear_lr_decay:

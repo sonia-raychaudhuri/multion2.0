@@ -14,7 +14,7 @@ from habitat_baselines.rl.models.projection import Projection, RotateTensor, get
 from habitat_baselines.rl.models.rnn_state_encoder import RNNStateEncoder
 from habitat_baselines.rl.models.simple_cnn import (
     RGBCNNNonOracle, RGBCNNOracle, MapCNN, SimpleCNN, 
-    SemanticMapCNN, SemmapDecoder)
+    SemanticMapCNN, SemmapDecoder, SimpleRgbCNN)
 from habitat_baselines.rl.models.resnet_encoders import VisualRednetEncoder, SemanticObjectDetector
 from habitat_baselines.rl.models.projection import Projection
 from habitat.utils.visualizations import maps
@@ -211,9 +211,10 @@ class PolicySemantic(nn.Module):
         loss = nn.CrossEntropyLoss(reduction='mean')
         semantic_map_loss = loss(sem_goal_map, observations['semMap'].long())
         
-        bce_loss = nn.BCELoss(reduction='mean')
-        oracle_next_goal_map = (observations['semMap'].long() == observations['multiobjectgoal'].unsqueeze(1)).float()
-        next_goal_map_loss = bce_loss(next_goal_map, oracle_next_goal_map)
+        oracle_next_goal_map = (observations['semMap'].long() == torch.add(observations['multiobjectgoal'],1).unsqueeze(1)).float()
+        #next_goal_loss = nn.BCELoss(reduction='mean')
+        next_goal_loss = nn.MSELoss(reduction='mean')
+        next_goal_map_loss = next_goal_loss(next_goal_map, oracle_next_goal_map)
         
         return (value, action_log_probs, distribution_entropy, rnn_hidden_states, 
                 semantic_map_loss, next_goal_map_loss)
@@ -647,11 +648,16 @@ class BaselineNetSemantic(Net):
         self.num_occ_classes = self.config.RL.MAPS.num_occ_classes
         self.linear_out = self.config.RL.MAPS.linear_out
         self.use_occupancy = self.config.RL.MAPS.USE_OCCUPANCY
+        self.visual_encoder_type = self.config.RL.MAPS.visual_encoder_type
 
-        #self.visual_encoder = RGBCNNNonOracle(observation_space, hidden_size) # 3CONV
-        #self.visual_encoder = VisualRednetEncoder(observation_space, hidden_size, device)  # RedNet
-        self.visual_encoder = SemanticObjectDetector(device, 
-                                                     obs_size=observation_space.spaces['rgb'].shape)  # Faster RCNN - finetuned on goal objects
+        if self.visual_encoder_type == "fasterrcnn":
+            self.visual_encoder = SemanticObjectDetector(device, 
+                                    obs_size=observation_space.spaces['rgb'].shape)  # Faster RCNN - finetuned on goal objects
+        elif self.visual_encoder_type == "simple":
+            self.visual_encoder = SimpleRgbCNN(observation_space, hidden_size) # 3CONV
+        elif self.visual_encoder_type == "rednet":
+            self.visual_encoder = VisualRednetEncoder(observation_space, hidden_size, device)  # RedNet
+            
         self.visual_encoder_output_size = self.visual_encoder._output_size
         
         # Map projection
@@ -771,7 +777,7 @@ class BaselineNetSemantic(Net):
                 sem_goal_map_feats.permute(0, 2, 3, 1),
                 goal_embed.unsqueeze(1).unsqueeze(1),
                 dim=-1)
-            next_goal_map = nn.ReLU()(next_goal_map)    # to omit negative similarity values
+            next_goal_map = nn.Softmax()(next_goal_map)    # to omit negative similarity values
 
             # linearize
             next_goal_map_linear = self.flatten(next_goal_map)
@@ -801,7 +807,7 @@ class BaselineNetSemantic(Net):
                 sem_goal_map_feats.permute(0, 2, 3, 1),
                 goal_embed.unsqueeze(1).unsqueeze(1),
                 dim=-1)
-            next_goal_map = nn.ReLU()(next_goal_map)    # to omit negative similarity values
+            next_goal_map = nn.Softmax(dim=-1)(next_goal_map)
 
             # linearize
             next_goal_map_linear = self.flatten(next_goal_map)

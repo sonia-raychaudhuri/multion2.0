@@ -338,7 +338,7 @@ class PPOSemantic(nn.Module):
         total_loss_epoch /= num_updates
 
         return (value_loss_epoch, action_loss_epoch, dist_entropy_epoch, 
-                semantic_map_loss_epoch, next_goal_map_loss_epoch, occupancy_map_loss_epoch, total_loss_epoch)
+                semantic_map_loss_epoch, next_goal_map_loss_epoch, occupancy_map_loss_epoch) #, total_loss_epoch)
 
     def _evaluate_actions(
         self, observations, rnn_hidden_states, global_map, prev_actions, masks, action

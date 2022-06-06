@@ -29,13 +29,21 @@ class SemanticObjectDetector(nn.Module):
         self.in_channels = 1024
         
         self.model = self.get_object_detection_model()
+        # disable gradients for resnet, params frozen
+        for param in self.model.parameters():
+            param.requires_grad = False
         self.model.eval()
         self.model.to('cpu')
         #self.model.to(device)
         
         self.feature_extractor = self.get_feature_extractor()
+        # disable gradients for resnet, params frozen
+        for param in self.feature_extractor.parameters():
+            param.requires_grad = False
         self.feature_extractor.eval()
         #self.feature_extractor.to(device)
+        self.feature_extractor.to('cpu')
+        
         self.cnn = nn.Sequential(
                 nn.Conv2d(
                     in_channels=self.in_channels,
@@ -54,10 +62,8 @@ class SemanticObjectDetector(nn.Module):
                     padding=1, 
                     bias=False,
                 ),
-                nn.ReLU(True),
             )
         #self.cnn.to(device)
-        self.cnn.to('cpu')
         
         self.tranform = torchvision.transforms.ToTensor()
         
