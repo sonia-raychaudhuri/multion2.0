@@ -46,14 +46,13 @@ class VisualRednetEncoder(nn.Module):
             'load_model': 'data/rednet_mp3d_best_model.pkl',
         }
 
-        self.model_rednet = nn.Module()
-        self.model_rednet.module = RedNet(cfg_rednet)
+        self.model_rednet = RedNet(cfg_rednet)
         self.model_rednet = self.model_rednet.to(device)
 
         #print('Loading pre-trained weights: ', cfg_rednet['load_model'])
         state = torch.load(cfg_rednet['load_model'])
         model_state = state['model_state']
-        model_state = self.rename_weights(model_state, device)
+        model_state = self.rename_weights(model_state, 'cpu')
         self.model_rednet.load_state_dict(model_state)
         
         # disable gradients for resnet, params frozen
@@ -63,7 +62,7 @@ class VisualRednetEncoder(nn.Module):
         
         self.model_rednet.cnn = nn.Sequential(
                 nn.Conv2d(
-                    in_channels=self.model_rednet.module.inplanes,
+                    in_channels=self.model_rednet.inplanes,
                     out_channels=32,
                     kernel_size=8,
                     stride=5,
@@ -74,9 +73,9 @@ class VisualRednetEncoder(nn.Module):
     def rename_weights(self, weights, device):
         names = list(weights.keys())
         is_module = names[0].split('.')[0] == 'module'
-        if device.type == 'cuda' and not is_module:
+        if device == 'cuda' and not is_module:
             new_weights = {'module.'+k:v for k,v in weights.items()}
-        elif device.type == 'cpu' and is_module:
+        elif device == 'cpu' and is_module:
             new_weights = {'.'.join(k.split('.')[1:]):v for k,v in weights.items()}
         else:
             new_weights = weights
@@ -99,7 +98,7 @@ class VisualRednetEncoder(nn.Module):
             # permute tensor to dimension [BATCH x CHANNEL x HEIGHT X WIDTH]
             depth_observations = depth_observations.permute(0, 3, 1, 2)
 
-        output = self.model_rednet.module(rgb_observations, depth_observations)
+        output = self.model_rednet(rgb_observations, depth_observations)
         feats = self.model_rednet.cnn(output)
         return feats
 
