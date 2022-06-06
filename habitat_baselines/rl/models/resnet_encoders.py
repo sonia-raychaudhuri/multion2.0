@@ -7,12 +7,135 @@ from gym import spaces
 from habitat import logger
 from habitat.core.utils import try_cv2_import
 from habitat_baselines.rl.models.rednet import RedNet
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+import torchvision
+from PIL import Image
+import pickle
+from torchvision.models.feature_extraction import  create_feature_extractor
 
 cv2 = try_cv2_import()
 
 class Flatten(nn.Module):
     def forward(self, x):
         return x.contiguous().view(x.size(0), -1)
+
+class SemanticObjectDetector(nn.Module):
+    def __init__(self, device, obs_size, extract_layer=3):
+        super().__init__()
+        
+        self.device = device
+        self.obs_size = obs_size
+        self.extract_layer = extract_layer
+        self.in_channels = 1024
+        
+        self.model = self.get_object_detection_model()
+        self.model.eval()
+        self.model.to('cpu')
+        #self.model.to(device)
+        
+        self.feature_extractor = self.get_feature_extractor()
+        self.feature_extractor.eval()
+        #self.feature_extractor.to(device)
+        self.cnn = nn.Sequential(
+                nn.Conv2d(
+                    in_channels=self.in_channels,
+                    out_channels=128,
+                    kernel_size=7, 
+                    stride=1, 
+                    padding=3, 
+                    bias=False,
+                ),
+                nn.ReLU(True),
+                nn.Conv2d(
+                    in_channels=128,
+                    out_channels=32,
+                    kernel_size=3, 
+                    stride=1, 
+                    padding=1, 
+                    bias=False,
+                ),
+                nn.ReLU(True),
+            )
+        #self.cnn.to(device)
+        self.cnn.to('cpu')
+        
+        self.tranform = torchvision.transforms.ToTensor()
+        
+    def get_feature_extractor(self):
+        feature_extractor = create_feature_extractor(self.model.backbone.body, 
+                                                     {'layer1': 'feat1', 'layer2': 'feat2',
+                                                      'layer3': 'feat3', 'layer4': 'feat4'})
+        
+        return feature_extractor
+
+    def get_object_detection_model(self, num_classes=9):
+        # load a model pre-trained pre-trained on COCO
+        model = torchvision.models.detection.fasterrcnn_resnet50_fpn(
+            pretrained=True)
+
+        # get number of input features for the classifier
+        in_features = model.roi_heads.box_predictor.cls_score.in_features
+        # replace the pre-trained head with a new one
+        model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+        model.load_state_dict(torch.load('data/pretrained_models/obj_det_real.ckpt'))
+        return model
+
+    def apply_nms(self, orig_prediction, iou_thresh=0.3):
+        # torchvision returns the indices of the bboxes to keep
+        keep = torchvision.ops.nms(orig_prediction['boxes'],
+                                   orig_prediction['scores'], iou_thresh)
+
+        final_prediction = orig_prediction
+        final_prediction['boxes'] = final_prediction['boxes'][keep]
+        final_prediction['scores'] = final_prediction['scores'][keep]
+        final_prediction['labels'] = final_prediction['labels'][keep]
+
+        return final_prediction
+
+    def filter_pred(self, pred, img, threshold=0.95, threshold_knn=0.75):
+        pred['boxes'] = pred['boxes'].detach().cpu().numpy().tolist()
+        pred['scores'] = pred['scores'].detach().cpu().numpy().tolist()
+        pred['labels'] = pred['labels'].detach().cpu().numpy().tolist()
+        res = {}
+        res['boxes'] = []
+        res['scores'] = []
+        res['labels'] = []
+        colors = []
+        for idx, score in enumerate(pred['scores']):
+            if score > threshold and pred['labels'][idx] != 0:
+                box = pred['boxes'][idx]
+                res['boxes'].append(box)
+                res['scores'].append(pred['scores'][idx])
+                res['labels'].append(pred['labels'][idx])
+                #center_x = int((box[2] + box[0]) / 2)
+                #center_y = int((box[3] + box[1]) / 2)
+                #colors.append(img[center_y][center_x])
+
+        return res
+
+    def predict(self, img):
+        img_trans = self.tranform(Image.fromarray(img[0,:,:,:].cpu().numpy().astype(np.uint8)))
+        prediction = self.model([img_trans.to('cuda')])[0]
+        nms_prediction = self.apply_nms(prediction, iou_thresh=0.2)
+        res = self.filter_pred(nms_prediction, img)
+        return res
+    
+    def extract_features(self, img):
+        feats = self.feature_extractor(img)
+        return feats[f'feat{self.extract_layer}']
+    
+    def forward(self, observations):
+        img = observations['rgb'].permute(0,3,1,2).type(torch.float)
+        feats = self.extract_features(img)
+        cnn_feats = self.cnn(feats)
+        return cnn_feats
+    
+    @property
+    def _output_size(self):
+        s = (self.cnn(self.feature_extractor(torch.rand(self.obs_size).unsqueeze(0).permute(0,3,1,2))
+             [f'feat{self.extract_layer}']).data.shape)
+        return s
+        
 
 class VisualRednetEncoder(nn.Module):
     r"""Based on RedNet

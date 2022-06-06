@@ -15,7 +15,7 @@ from habitat_baselines.rl.models.rnn_state_encoder import RNNStateEncoder
 from habitat_baselines.rl.models.simple_cnn import (
     RGBCNNNonOracle, RGBCNNOracle, MapCNN, SimpleCNN, 
     SemanticMapCNN, SemmapDecoder)
-from habitat_baselines.rl.models.resnet_encoders import VisualRednetEncoder
+from habitat_baselines.rl.models.resnet_encoders import VisualRednetEncoder, SemanticObjectDetector
 from habitat_baselines.rl.models.projection import Projection
 from habitat.utils.visualizations import maps
 from PIL import Image
@@ -173,7 +173,7 @@ class PolicySemantic(nn.Module):
         masks,
         deterministic=False,
     ):
-        features, rnn_hidden_states, global_map, next_goal_map = self.net(
+        features, rnn_hidden_states, global_map, sem_goal_map, next_goal_map = self.net(
             observations, rnn_hidden_states, global_map, prev_actions, masks
         )
 
@@ -191,7 +191,7 @@ class PolicySemantic(nn.Module):
                 global_map)
 
     def get_value(self, observations, rnn_hidden_states, global_map, prev_actions, masks):
-        features, _, _, _ = self.net(
+        features, _, _, _, _ = self.net(
             observations, rnn_hidden_states, global_map, prev_actions, masks
         )
         return self.critic(features)
@@ -199,7 +199,7 @@ class PolicySemantic(nn.Module):
     def evaluate_actions(
         self, observations, rnn_hidden_states, global_map, prev_actions, masks, action
     ):
-        features, rnn_hidden_states, global_map, next_goal_map = self.net(
+        features, rnn_hidden_states, global_map, sem_goal_map, next_goal_map = self.net(
             observations, rnn_hidden_states, global_map, prev_actions, masks, ev=1
         )
         distribution = self.action_distribution(features)
@@ -209,10 +209,14 @@ class PolicySemantic(nn.Module):
         distribution_entropy = distribution.entropy().mean()
 
         loss = nn.CrossEntropyLoss(reduction='mean')
-        next_goal_map_loss = loss(next_goal_map, observations['nextGoalMap'].long())
+        semantic_map_loss = loss(sem_goal_map, observations['semMap'].long())
+        
+        bce_loss = nn.BCELoss(reduction='mean')
+        oracle_next_goal_map = (observations['semMap'].long() == observations['multiobjectgoal'].unsqueeze(1)).float()
+        next_goal_map_loss = bce_loss(next_goal_map, oracle_next_goal_map)
         
         return (value, action_log_probs, distribution_entropy, rnn_hidden_states, 
-                next_goal_map_loss)
+                semantic_map_loss, next_goal_map_loss)
 
 
 class PolicyOracle(nn.Module):
@@ -644,8 +648,11 @@ class BaselineNetSemantic(Net):
         self.linear_out = self.config.RL.MAPS.linear_out
         self.use_occupancy = self.config.RL.MAPS.USE_OCCUPANCY
 
-        #self.visual_encoder = RGBCNNNonOracle(observation_space, hidden_size) #3CONV
-        self.visual_encoder = VisualRednetEncoder(observation_space, hidden_size, device)
+        #self.visual_encoder = RGBCNNNonOracle(observation_space, hidden_size) # 3CONV
+        #self.visual_encoder = VisualRednetEncoder(observation_space, hidden_size, device)  # RedNet
+        self.visual_encoder = SemanticObjectDetector(device, 
+                                                     obs_size=observation_space.spaces['rgb'].shape)  # Faster RCNN - finetuned on goal objects
+        self.visual_encoder_output_size = self.visual_encoder._output_size
         
         # Map projection
         self.projection = Projection(self.egocentric_map_size, self.global_map_size, 
@@ -654,37 +661,31 @@ class BaselineNetSemantic(Net):
         self.to_grid = to_grid(self.global_map_size, self.coordinate_min, self.coordinate_max)
         self.rotate_tensor = RotateTensor(device)
 
-        self.image_features_linear = nn.Linear(self.global_map_depth * 25 * 25, self.linear_out)
+        self.image_features_linear = nn.Linear(
+            np.prod(self.visual_encoder_output_size), 
+            self.linear_out)
 
         self.flatten = Flatten()
 
         self.action_embedding = nn.Embedding(4, previous_action_embedding_size)
         
+        self.full_global_map_depth = self.visual_encoder_output_size[1]
         self.full_global_map = torch.zeros(
             batch_size,
             self.global_map_size,
             self.global_map_size,
-            object_category_embedding_size,
+            self.full_global_map_depth,
             device=self.device,
         )
         
-        # Accumulated ego map encoder
-        self.global_map_encoder = SemanticMapCNN(map_size=self.local_map_size, 
-                                              input_channels=self.global_map_depth, 
-                                              num_classes=object_category_embedding_size)
-        self.global_map_encoder_linear = MapCNN(self.local_map_size, self.linear_out, 
-                                                "non-oracle",
-                                                (self.global_map_depth + 2))
-        
-        self.sem_map_decoder = SemmapDecoder(1, 2)
+        self.sem_map_decoder = SemmapDecoder(feat_dim=self.full_global_map_depth, n_obj_classes=self.num_classes)
 
         self.object_embedding = nn.Embedding(self.num_classes, object_category_embedding_size)
         
         self.state_encoder = RNNStateEncoder(
-            ((0 if self.is_blind 
-                else self._hidden_size)           # visual_encoder
+            (self._hidden_size           # visual_encoder
             + object_category_embedding_size    # goal_embedding
-            + self.linear_out                   # next goal map embedding
+            + (self.local_map_size*self.local_map_size)  # next goal map embedding
             + (previous_action_embedding_size 
                 if self.use_previous_action else 0)    # action_embedding
             ), 
@@ -712,13 +713,10 @@ class BaselineNetSemantic(Net):
         return observations[self.goal_sensor_uuid]
 
     def forward(self, observations, rnn_hidden_states, global_map, prev_actions, masks, ev=0):
-        target_encoding = torch.add(
-            (self.get_target_encoding(observations)).type(torch.LongTensor).to(self.device), 
-            3) # add 3 to match sem_map obj categories (refer to env.py)
-        goal_embed = self.object_embedding(target_encoding).squeeze(1)
+        target_encoding = self.get_target_encoding(observations)
+        goal_embed = self.object_embedding((target_encoding).type(torch.LongTensor).to(self.device)).squeeze(1)
         
-        if not self.is_blind:
-            perception_embed = self.visual_encoder(observations)
+        perception_embed = self.visual_encoder(observations)
         # interpolated_perception_embed = F.interpolate(perception_embed, scale_factor=256./28., mode='bilinear')
         projection = self.projection.forward(perception_embed, observations['depth'] * 10, -(observations["compass"]))
         perception_embed = self.image_features_linear(self.flatten(perception_embed))
@@ -732,9 +730,9 @@ class BaselineNetSemantic(Net):
                 self.full_global_map[bs:, :, :, :] = self.full_global_map[bs:, :, :, :] * 0
             if torch.cuda.is_available():
                 with torch.cuda.device(self.device):
-                    agent_view = torch.cuda.FloatTensor(bs, self.global_map_depth, self.global_map_size, self.global_map_size).fill_(0)
+                    agent_view = torch.cuda.FloatTensor(bs, self.full_global_map_depth, self.global_map_size, self.global_map_size).fill_(0)
             else:
-                agent_view = torch.FloatTensor(bs, self.global_map_depth, self.global_map_size, self.global_map_size).to(self.device).fill_(0)
+                agent_view = torch.FloatTensor(bs, self.full_global_map_depth, self.global_map_size, self.global_map_size).to(self.device).fill_(0)
             agent_view[:, :, 
                 self.global_map_size//2 - math.floor(self.egocentric_map_size/2):self.global_map_size//2 + math.ceil(self.egocentric_map_size/2), 
                 self.global_map_size//2 - math.floor(self.egocentric_map_size/2):self.global_map_size//2 + math.ceil(self.egocentric_map_size/2)
@@ -765,32 +763,29 @@ class BaselineNetSemantic(Net):
             ]
             final_retrieval = self.rotate_tensor.forward(translated_retrieval, observations["compass"])
 
-            # global map encoder
-            global_map_feats = self.global_map_encoder(final_retrieval)
+            # semantic map decoder
+            sem_goal_map_feats, sem_goal_map = self.sem_map_decoder(final_retrieval)
 
             # derive next goal location
-            next_goal_map_embed = torch.nn.functional.cosine_similarity(
-                global_map_feats.permute(0, 2, 3, 1),
+            next_goal_map = torch.nn.functional.cosine_similarity(
+                sem_goal_map_feats.permute(0, 2, 3, 1),
                 goal_embed.unsqueeze(1).unsqueeze(1),
                 dim=-1)
+            next_goal_map = nn.ReLU()(next_goal_map)    # to omit negative similarity values
 
-            # next goal map
-            next_goal_map = self.sem_map_decoder(next_goal_map_embed.unsqueeze(1))
-
-            # concat and linearize
-            global_map_embedding = torch.cat((global_map_feats, next_goal_map), dim=1)
-            global_map_embed = self.global_map_encoder_linear(global_map_embedding.contiguous().permute(0, 2, 3, 1))
+            # linearize
+            next_goal_map_linear = self.flatten(next_goal_map)
 
             if self.use_previous_action:
                 action_embedding = self.action_embedding(prev_actions).squeeze(1)
 
-            x = torch.cat((perception_embed, global_map_embed, goal_embed, action_embedding), dim = 1)
+            x = torch.cat((perception_embed, next_goal_map_linear, goal_embed, action_embedding), dim = 1)
             x, rnn_hidden_states = self.state_encoder(x, rnn_hidden_states.permute(1, 0, 2), masks)
-            return x, rnn_hidden_states.permute(1, 0, 2), final_retrieval.permute(0, 2, 3, 1), next_goal_map
+            return x, rnn_hidden_states.permute(1, 0, 2), final_retrieval.permute(0, 2, 3, 1), sem_goal_map, next_goal_map
         else: 
             global_map = global_map * masks.unsqueeze(1).unsqueeze(1)  ##verify
             with torch.cuda.device(self.device):
-                agent_view = torch.cuda.FloatTensor(bs, self.global_map_depth, 51, 51).fill_(0)
+                agent_view = torch.cuda.FloatTensor(bs, self.full_global_map_depth, 51, 51).fill_(0)
             agent_view[:, :, 
                 51//2 - math.floor(self.egocentric_map_size/2):51//2 + math.ceil(self.egocentric_map_size/2), 
                 51//2 - math.floor(self.egocentric_map_size/2):51//2 + math.ceil(self.egocentric_map_size/2)
@@ -798,28 +793,25 @@ class BaselineNetSemantic(Net):
             
             final_retrieval = torch.max(global_map, agent_view.permute(0, 2, 3, 1))
 
-            # global map encoder
-            global_map_feats = self.global_map_encoder(final_retrieval.permute(0,3,1,2))
-            
+            # semantic map decoder
+            sem_goal_map_feats, sem_goal_map = self.sem_map_decoder(final_retrieval.permute(0,3,1,2))
+
             # derive next goal location
-            next_goal_map_embed = torch.nn.functional.cosine_similarity(
-                global_map_feats.permute(0, 2, 3, 1),
+            next_goal_map = torch.nn.functional.cosine_similarity(
+                sem_goal_map_feats.permute(0, 2, 3, 1),
                 goal_embed.unsqueeze(1).unsqueeze(1),
                 dim=-1)
+            next_goal_map = nn.ReLU()(next_goal_map)    # to omit negative similarity values
 
-            # next goal map
-            next_goal_map = self.sem_map_decoder(next_goal_map_embed.unsqueeze(1))
-
-            # concat and linearize
-            global_map_embedding = torch.cat((global_map_feats, next_goal_map), dim=1)
-            global_map_embed = self.global_map_encoder_linear(global_map_embedding.contiguous().permute(0, 2, 3, 1))
+            # linearize
+            next_goal_map_linear = self.flatten(next_goal_map)
 
             if self.use_previous_action:
                 action_embedding = self.action_embedding(prev_actions).squeeze(1)
 
-            x = torch.cat((perception_embed, global_map_embed, goal_embed, action_embedding), dim = 1)
+            x = torch.cat((perception_embed, next_goal_map_linear, goal_embed, action_embedding), dim = 1)
             x, rnn_hidden_states = self.state_encoder(x, rnn_hidden_states.permute(1, 0, 2), masks)
-            return x, rnn_hidden_states.permute(1, 0, 2), final_retrieval.permute(0, 2, 3, 1), next_goal_map
+            return x, rnn_hidden_states.permute(1, 0, 2), final_retrieval, sem_goal_map, next_goal_map
             
 class BaselineNetOracle(Net):
     r"""Network which passes the input image through CNN and concatenates

@@ -536,8 +536,7 @@ class Env:
         elif self._config.TRAINER_NAME in ["semantic"]:
             # Currently we are not considering occupancy
             channel_num = 1
-            self.currMap[:, :, 1] += 2  # rest of the cells are 1 or 2 depending on FOW mask
-            objIndexOffset = 3          # obj category starts from 3 (refer to above line)
+            objIndexOffset = 0
 
             # Adding goal information on the map
             for i in range(len(self.current_episode.goals)):
@@ -580,11 +579,7 @@ class Env:
                     self.currMap.shape[0:2],
                     sim=self._sim,
                 )
-            
-            """ self.expose = np.repeat(
-                self.task.measurements.measures["fow_map"].get_metric()[:, :, np.newaxis], 3, axis = 2
-            )
-            patch_tmp = self.currMap * self.expose """
+
             patch_tmp = self.currMap
             
             cropped_map_mid = (self.cropped_map_size//2)
@@ -613,8 +608,8 @@ class Env:
             sem_map = patch[cropped_map_mid-ego_map_mid:cropped_map_mid+ego_map_mid+1, 
                             cropped_map_mid-1:cropped_map_mid+self.egocentric_map_size, 1]
             
-            occ_map = patch[cropped_map_mid-ego_map_mid:cropped_map_mid+ego_map_mid+1, 
-                            cropped_map_mid-1:cropped_map_mid+self.egocentric_map_size, 0]
+            # occ_map = patch[cropped_map_mid-ego_map_mid:cropped_map_mid+ego_map_mid+1, 
+            #                 cropped_map_mid-1:cropped_map_mid+self.egocentric_map_size, 0]
             
             """ Image.fromarray(
                 maps.colorize_topdown_map(
@@ -623,8 +618,8 @@ class Env:
                 ).save(
                 f"test_maps/{self.current_episode.episode_id}_new_0.png")
             self.count = 0 """
-            #observations["semMap"] = sem_map
-            observations["nextGoalMap"] = ((sem_map-3) == observations['multiobjectgoal'])
+            observations["semMap"] = sem_map
+            #observations["nextGoalMap"] = ((sem_map-3) == observations['multiobjectgoal'])
             #observations["occMap"] = occ_map
             
         return observations
@@ -662,12 +657,15 @@ class Env:
 
         """ if self._config.ORACLE_FOUND and self._episode_oracle_found():
             action = 0  # Oracle Found """
-            
-        self.task.is_found_called = bool(action == 0)
         
         # Support simpler interface as well
         if isinstance(action, (str, int, np.integer)):
+            self.task.is_found_called = bool(action == 0)
             action = {"action": action}
+        else:
+            if action["action"] == 0:
+                print('action=0.')
+            self.task.is_found_called = bool(action["action"] == 0)
             
         observations = self.task.step(
             action=action, episode=self.current_episode
@@ -780,11 +778,7 @@ class Env:
                     self.currMap.shape[0:2],
                     sim=self._sim,
                 )
-                
-            """ self.expose = np.repeat(
-                self.task.measurements.measures["fow_map"].get_metric()[:, :, np.newaxis], 3, axis = 2
-            )
-            patch_tmp = self.currMap * self.expose """
+
             patch_tmp = self.currMap
             
             cropped_map_mid = (self.cropped_map_size//2)
@@ -823,8 +817,8 @@ class Env:
                 ).save(
                 f"test_maps/{self.current_episode.episode_id}_new_{self.count}.png")
             self.count += 1 """
-            #observations["semMap"] = sem_map
-            observations["nextGoalMap"] = ((sem_map-3) == observations['multiobjectgoal'])
+            observations["semMap"] = sem_map
+            #observations["nextGoalMap"] = ((sem_map-3) == observations['multiobjectgoal'])
             #observations["occMap"] = occ_map
             
         ##Terminates episode if wrong found is called

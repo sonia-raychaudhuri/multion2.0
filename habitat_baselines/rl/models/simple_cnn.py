@@ -677,12 +677,12 @@ class SemmapDecoder(nn.Module):
                                    nn.Conv2d(128, 64, kernel_size=3, stride=1, padding=1, bias=False),
                                    nn.BatchNorm2d(64),
                                    nn.ReLU(inplace=True),
-                                   nn.Conv2d(64, 48, kernel_size=3, stride=1, padding=1, bias=False),
-                                   nn.BatchNorm2d(48),
+                                   nn.Conv2d(64, feat_dim, kernel_size=3, stride=1, padding=1, bias=False),
+                                   nn.BatchNorm2d(feat_dim),
                                    nn.ReLU(inplace=True),
                                   )
 
-        self.obj_layer = nn.Sequential(nn.Conv2d(48, 48, kernel_size=3, stride=1, padding=1, bias=False),
+        self.obj_layer = nn.Sequential(nn.Conv2d(feat_dim, 48, kernel_size=3, stride=1, padding=1, bias=False),
                                        nn.BatchNorm2d(48),
                                        nn.ReLU(inplace=True),
                                        nn.Conv2d(48, n_obj_classes,
@@ -693,4 +693,4 @@ class SemmapDecoder(nn.Module):
     def forward(self, memory):
         l1 = self.layer(memory)
         out_obj = self.obj_layer(l1)
-        return out_obj
+        return l1, out_obj

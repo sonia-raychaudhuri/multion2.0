@@ -249,6 +249,7 @@ class PPOSemantic(nn.Module):
         semantic_map_loss_epoch = 0.0
         next_goal_map_loss_epoch = 0.0
         occupancy_map_loss_epoch = 0.0
+        total_loss_epoch = 0.0
 
         for _e in range(self.ppo_epoch):
             profiling_wrapper.range_push("PPO.update epoch")
@@ -262,6 +263,7 @@ class PPOSemantic(nn.Module):
                     action_log_probs,
                     dist_entropy,
                     _,
+                    semantic_map_loss,
                     next_goal_map_loss,
                 ) = self._evaluate_actions(
                     batch["observations"],
@@ -306,6 +308,7 @@ class PPOSemantic(nn.Module):
                     + action_loss
                     - dist_entropy * self.entropy_coef
                     + next_goal_map_loss * self.next_goal_map_loss_coef
+                    + semantic_map_loss * self.semantic_map_loss_coef
                 )
 
                 self.before_backward(total_loss)
@@ -320,6 +323,8 @@ class PPOSemantic(nn.Module):
                 action_loss_epoch += action_loss.item()
                 dist_entropy_epoch += dist_entropy.item()
                 next_goal_map_loss_epoch += next_goal_map_loss.item()
+                semantic_map_loss_epoch += semantic_map_loss.item()
+                total_loss_epoch += total_loss.item()
 
             profiling_wrapper.range_pop()  # PPO.update epoch
 
@@ -329,9 +334,11 @@ class PPOSemantic(nn.Module):
         action_loss_epoch /= num_updates
         dist_entropy_epoch /= num_updates
         next_goal_map_loss_epoch /= num_updates
+        semantic_map_loss_epoch /= num_updates
+        total_loss_epoch /= num_updates
 
         return (value_loss_epoch, action_loss_epoch, dist_entropy_epoch, 
-                semantic_map_loss_epoch, next_goal_map_loss_epoch, occupancy_map_loss_epoch)
+                semantic_map_loss_epoch, next_goal_map_loss_epoch, occupancy_map_loss_epoch, total_loss_epoch)
 
     def _evaluate_actions(
         self, observations, rnn_hidden_states, global_map, prev_actions, masks, action

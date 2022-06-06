@@ -2339,7 +2339,7 @@ class PPOTrainerSemantic(PPOTrainer):
 
         self.agent.train()
 
-        value_loss, action_loss, dist_entropy, semantic_map_loss, next_goal_map_loss, occupancy_map_loss = self.agent.update(
+        value_loss, action_loss, dist_entropy, semantic_map_loss, next_goal_map_loss, occupancy_map_loss, total_loss = self.agent.update(
             self.rollouts
         )
 
@@ -2350,7 +2350,9 @@ class PPOTrainerSemantic(PPOTrainer):
             value_loss,
             action_loss,
             dist_entropy,
+            semantic_map_loss,
             next_goal_map_loss,
+            total_loss
         )
 
     @rank0_only
@@ -2577,7 +2579,9 @@ class PPOTrainerSemantic(PPOTrainer):
                     value_loss,
                     action_loss,
                     dist_entropy,
+                    semantic_map_loss,
                     next_goal_map_loss,
+                    total_loss
                 ) = self._update_agent()
 
                 if ppo_cfg.use_linear_lr_decay:
@@ -2588,6 +2592,7 @@ class PPOTrainerSemantic(PPOTrainer):
                     dict(
                         value_loss=value_loss,
                         action_loss=action_loss,
+                        semantic_map_loss=semantic_map_loss,
                         next_goal_map_loss=next_goal_map_loss,
                         entropy=dist_entropy,
                     ),
@@ -2759,6 +2764,7 @@ class PPOTrainerSemantic(PPOTrainer):
                     _,
                     test_recurrent_hidden_states,
                     test_global_map,
+                    semantic_map,
                     next_goal_map, 
                 ) = self.actor_critic.act(
                     batch,
@@ -2839,6 +2845,7 @@ class PPOTrainerSemantic(PPOTrainer):
                             info=infos[i],
                             action=actions[i],
                             global_map=test_global_map[i],
+                            semantic_map=semantic_map[i],
                             next_goal_map=next_goal_map[i],
                         )
                         txt_to_show = ('Action: '+ str(actions[i].item()) + 
@@ -2874,6 +2881,7 @@ class PPOTrainerSemantic(PPOTrainer):
                         info=infos[i],
                         action=actions[i],
                         global_map=test_global_map[i],
+                        semantic_map=semantic_map[i],
                         next_goal_map=next_goal_map[i],
                     )
                     txt_to_show = ('Action: '+ str(actions[i].item()) + 
