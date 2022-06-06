@@ -190,10 +190,10 @@ class HabitatSimSemanticSensor(SemanticSensor, HabitatSimSensor):
 
     def _get_observation_space(self, *args: Any, **kwargs: Any):
         return spaces.Box(
-            low=np.iinfo(np.uint32).min,
-            high=np.iinfo(np.uint32).max,
+            low=np.iinfo(np.uint8).min,
+            high=np.iinfo(np.uint8).max,
             shape=(self.config.HEIGHT, self.config.WIDTH),
-            dtype=np.uint32,
+            dtype=np.uint8,
         )
 
     def get_observation(

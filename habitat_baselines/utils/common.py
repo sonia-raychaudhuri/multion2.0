@@ -253,6 +253,8 @@ def batch_obs(
                 batch[sensor_name].append(torch.as_tensor(sensor))
             else:
                 if sensor_name not in batch_t:
+                    if sensor.dtype == 'uint32':
+                        sensor = sensor.astype(np.uint8)
                     batch_t[sensor_name] = cache.get(  # type: ignore
                         len(observations),
                         sensor_name,

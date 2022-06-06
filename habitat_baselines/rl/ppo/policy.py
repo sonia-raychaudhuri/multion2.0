@@ -643,7 +643,7 @@ class BaselineNetSemantic(Net):
         self.coordinate_max = self.config.RL.MAPS.coordinate_max
         self.coordinate_min = self.config.RL.MAPS.coordinate_min
         self.local_map_size = self.config.RL.MAPS.local_map_size
-        self.num_classes = self.config.RL.MAPS.num_classes
+        self.num_classes = self.config.RL.MAPS.num_classes + 1 # Add 1 to indicate no object when it is zero
         self.num_occ_classes = self.config.RL.MAPS.num_occ_classes
         self.linear_out = self.config.RL.MAPS.linear_out
         self.use_occupancy = self.config.RL.MAPS.USE_OCCUPANCY

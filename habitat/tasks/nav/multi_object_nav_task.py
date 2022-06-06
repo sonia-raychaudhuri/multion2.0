@@ -224,6 +224,7 @@ class MultiObjectNavigationTask(NavigationTask):
                 str(os.path.join(obj_path, current_goal))
             )[0]
             ind = self._sim.add_object(object_index)
+            self._sim.set_object_semantic_id(object_index, ind)
             self._sim.set_translation(np.array(episode.goals[i].position), ind)
             
             # random rotation only on the Y axis
@@ -242,6 +243,7 @@ class MultiObjectNavigationTask(NavigationTask):
                 )[0]
                 
                 ind = self._sim.add_object(dataset_index)
+                self._sim.set_object_semantic_id(dataset_index, ind)
                 self._sim.set_translation(np.array(episode.distractors[i].position), ind)
                 
                 # random rotation only on the Y axis

@@ -278,15 +278,16 @@ class Env:
         # Insert object here
         obj_type = self._config["TASK"]["OBJECTS_TYPE"]
         if obj_type == "CYL":
-            object_to_datset_mapping = {'cylinder_red':0, 'cylinder_green':1, 'cylinder_blue':2, 'cylinder_yellow':3, 'cylinder_white':4, 'cylinder_pink':5, 'cylinder_black':6, 'cylinder_cyan':7}
+            self.object_to_datset_mapping = {'cylinder_red':0, 'cylinder_green':1, 'cylinder_blue':2, 'cylinder_yellow':3, 'cylinder_white':4, 'cylinder_pink':5, 'cylinder_black':6, 'cylinder_cyan':7}
         else:
-            object_to_datset_mapping = {'guitar':0, 'electric_piano':1, 'basket_ball':2,'toy_train':3, 'teddy_bear':4, 'rocking_horse':5, 'backpack': 6, 'trolley_bag':7}
+            self.object_to_datset_mapping = {'guitar':0, 'electric_piano':1, 'basket_ball':2,'toy_train':3, 'teddy_bear':4, 'rocking_horse':5, 'backpack': 6, 'trolley_bag':7}
             
             
         for i in range(len(self.current_episode.goals)):
             current_goal = self.current_episode.goals[i].object_category
-            dataset_index = object_to_datset_mapping[current_goal]
+            dataset_index = self.object_to_datset_mapping[current_goal]
             ind = self._sim.add_object(dataset_index)
+            self._sim.set_object_semantic_id(dataset_index, ind)
             self._sim.set_translation(np.array(self.current_episode.goals[i].position), ind)
             
             # random rotation only on the Y axis
@@ -299,8 +300,9 @@ class Env:
         if self._config["TASK"]["INCLUDE_DISTRACTORS"]:
             for i in range(len(self.current_episode.distractors)):
                 current_distractor = self.current_episode.distractors[i].object_category
-                dataset_index = object_to_datset_mapping[current_distractor]
+                dataset_index = self.object_to_datset_mapping[current_distractor]
                 ind = self._sim.add_object(dataset_index)
+                self._sim.set_object_semantic_id(dataset_index, ind)
                 self._sim.set_translation(np.array(self.current_episode.distractors[i].position), ind)
                 
                 # random rotation only on the Y axis
@@ -377,7 +379,7 @@ class Env:
                     sim=self._sim,
                 )
                 objIndexOffset = 1 if self._config.TRAINER_NAME == "oracle" else 2
-                self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, channel_num] = object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
+                self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, channel_num] = self.object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
                 
             if self._config["TASK"]["INCLUDE_DISTRACTORS"]:
                 if self._config["TASK"]["ORACLE_MAP_INCLUDE_DISTRACTORS_W_GOAL"]:
@@ -398,7 +400,7 @@ class Env:
                         self.currMap.shape[0:2],
                         sim=self._sim,
                     )
-                    self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, channel_num] = object_to_datset_mapping[self.current_episode.distractors[i].object_category] + distrIndexOffset
+                    self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, channel_num] = self.object_to_datset_mapping[self.current_episode.distractors[i].object_category] + distrIndexOffset
 
             #currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
             currPix = maps.to_grid(
@@ -453,10 +455,10 @@ class Env:
                     sim=self._sim,
                 )
                 objIndexOffset = 1
-                self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, channel_num] = object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
+                self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, channel_num] = self.object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
             
                 # Marking category of the goals
-                self.objGraph[grid_loc[0]-3:grid_loc[0]+4, grid_loc[1]-3:grid_loc[1]+4, 0] = object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
+                self.objGraph[grid_loc[0]-3:grid_loc[0]+4, grid_loc[1]-3:grid_loc[1]+4, 0] = self.object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
                 self.objGraph[grid_loc[0]-3:grid_loc[0]+4, grid_loc[1]-3:grid_loc[1]+4, 1] = loc0
                 self.objGraph[grid_loc[0]-3:grid_loc[0]+4, grid_loc[1]-3:grid_loc[1]+4, 2] = loc2
                 
@@ -479,7 +481,7 @@ class Env:
                         self.currMap.shape[0:2],
                         sim=self._sim,
                     )
-                    self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, channel_num] = object_to_datset_mapping[self.current_episode.distractors[i].object_category] + distrIndexOffset
+                    self.currMap[grid_loc[0]-1:grid_loc[0]+2, grid_loc[1]-1:grid_loc[1]+2, channel_num] = self.object_to_datset_mapping[self.current_episode.distractors[i].object_category] + distrIndexOffset
 
             #currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
             currPix = maps.to_grid(
@@ -534,12 +536,15 @@ class Env:
             else:
                 observations["objectCat"] = 0
         elif self._config.TRAINER_NAME in ["semantic"]:
-            # Currently we are not considering occupancy
             channel_num = 1
-            objIndexOffset = 0
+            objIndexOffset = 1  # 0 -> no object
 
             # Adding goal information on the map
             for i in range(len(self.current_episode.goals)):
+                goal_id = self.object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
+                if goal_id not in observations["semantic"]:
+                    continue
+                
                 loc0 = self.current_episode.goals[i].position[0]
                 loc2 = self.current_episode.goals[i].position[2]
                 #grid_loc = self.conv_grid(loc0, loc2)
@@ -552,13 +557,16 @@ class Env:
                 self.currMap[
                     grid_loc[0]-1:grid_loc[0]+2, 
                     grid_loc[1]-1:grid_loc[1]+2, 
-                    channel_num] = (object_to_datset_mapping[self.current_episode.goals[i].object_category] 
-                                                + objIndexOffset)
+                    channel_num] = goal_id
                 
             if self._config["TASK"]["INCLUDE_DISTRACTORS"]:
                 # Adding distractor information on the map
                 num_distr = self._config["TASK"]["NUM_DISTRACTORS"] if self._config["TASK"]["NUM_DISTRACTORS"] > 0 else len(self.current_episode.distractors)
                 for i in range(num_distr):
+                    distractor_id = self.object_to_datset_mapping[self.current_episode.distractors[i].object_category] + objIndexOffset
+                    if distractor_id not in observations["semantic"]:
+                        continue
+                    
                     loc0 = self.current_episode.distractors[i].position[0]
                     loc2 = self.current_episode.distractors[i].position[2]
                     #grid_loc = self.conv_grid(loc0, loc2)
@@ -570,8 +578,7 @@ class Env:
                     )
                     self.currMap[grid_loc[0]-1:grid_loc[0]+2, 
                                  grid_loc[1]-1:grid_loc[1]+2, 
-                                 channel_num] = (object_to_datset_mapping[self.current_episode.distractors[i].object_category] 
-                                                                            + objIndexOffset)
+                                 channel_num] = distractor_id
 
             currPix = maps.to_grid(
                     observations["agent_position"][2],
@@ -611,13 +618,13 @@ class Env:
             # occ_map = patch[cropped_map_mid-ego_map_mid:cropped_map_mid+ego_map_mid+1, 
             #                 cropped_map_mid-1:cropped_map_mid+self.egocentric_map_size, 0]
             
-            """ Image.fromarray(
+            Image.fromarray(
                 maps.colorize_topdown_map(
-                    (sem_map-3+maps.MULTION_TOP_DOWN_MAP_START).astype(np.uint8)
+                    (sem_map-1+maps.MULTION_TOP_DOWN_MAP_START).astype(np.uint8)
                     )
                 ).save(
                 f"test_maps/{self.current_episode.episode_id}_new_0.png")
-            self.count = 0 """
+            self.count = 0
             observations["semMap"] = sem_map
             #observations["nextGoalMap"] = ((sem_map-3) == observations['multiobjectgoal'])
             #observations["occMap"] = occ_map
@@ -772,6 +779,50 @@ class Env:
             else:
                 observations["objectCat"] = 0
         elif self._config.TRAINER_NAME in ["semantic"]:
+            channel_num = 1
+            objIndexOffset = 1
+
+            # Adding goal information on the map
+            for i in range(len(self.current_episode.goals)):
+                goal_id = self.object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
+                if goal_id not in observations["semantic"]:
+                    continue
+                
+                loc0 = self.current_episode.goals[i].position[0]
+                loc2 = self.current_episode.goals[i].position[2]
+                #grid_loc = self.conv_grid(loc0, loc2)
+                grid_loc = maps.to_grid(
+                    loc2,
+                    loc0,
+                    self.currMap.shape[0:2],
+                    sim=self._sim,
+                )
+                self.currMap[
+                    grid_loc[0]-1:grid_loc[0]+2, 
+                    grid_loc[1]-1:grid_loc[1]+2, 
+                    channel_num] = goal_id
+                
+            if self._config["TASK"]["INCLUDE_DISTRACTORS"]:
+                # Adding distractor information on the map
+                num_distr = self._config["TASK"]["NUM_DISTRACTORS"] if self._config["TASK"]["NUM_DISTRACTORS"] > 0 else len(self.current_episode.distractors)
+                for i in range(num_distr):
+                    distractor_id = self.object_to_datset_mapping[self.current_episode.distractors[i].object_category] + objIndexOffset
+                    if distractor_id not in observations["semantic"]:
+                        continue
+                    
+                    loc0 = self.current_episode.distractors[i].position[0]
+                    loc2 = self.current_episode.distractors[i].position[2]
+                    #grid_loc = self.conv_grid(loc0, loc2)
+                    grid_loc = maps.to_grid(
+                        loc2,
+                        loc0,
+                        self.currMap.shape[0:2],
+                        sim=self._sim,
+                    )
+                    self.currMap[grid_loc[0]-1:grid_loc[0]+2, 
+                                 grid_loc[1]-1:grid_loc[1]+2, 
+                                 channel_num] = distractor_id
+
             currPix = maps.to_grid(
                     observations["agent_position"][2],
                     observations["agent_position"][0],
@@ -810,13 +861,13 @@ class Env:
             occ_map = patch[cropped_map_mid-ego_map_mid:cropped_map_mid+ego_map_mid+1, 
                             cropped_map_mid-1:cropped_map_mid+self.egocentric_map_size, 0]
             
-            """ Image.fromarray(
+            Image.fromarray(
                 maps.colorize_topdown_map(
-                    (sem_map-3+maps.MULTION_TOP_DOWN_MAP_START).astype(np.uint8)
+                    (sem_map-1+maps.MULTION_TOP_DOWN_MAP_START).astype(np.uint8)
                     )
                 ).save(
                 f"test_maps/{self.current_episode.episode_id}_new_{self.count}.png")
-            self.count += 1 """
+            self.count += 1
             observations["semMap"] = sem_map
             #observations["nextGoalMap"] = ((sem_map-3) == observations['multiobjectgoal'])
             #observations["occMap"] = occ_map
