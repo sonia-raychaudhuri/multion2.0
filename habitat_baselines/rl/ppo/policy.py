@@ -777,7 +777,7 @@ class BaselineNetSemantic(Net):
                 sem_goal_map_feats.permute(0, 2, 3, 1),
                 goal_embed.unsqueeze(1).unsqueeze(1),
                 dim=-1)
-            next_goal_map = nn.Softmax()(next_goal_map)    # to omit negative similarity values
+            next_goal_map = nn.Softmax()(next_goal_map)
 
             # linearize
             next_goal_map_linear = self.flatten(next_goal_map)

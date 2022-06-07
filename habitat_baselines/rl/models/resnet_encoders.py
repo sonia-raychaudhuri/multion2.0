@@ -156,13 +156,17 @@ class VisualRednetEncoder(nn.Module):
         self.device = device
         if "rgb" in observation_space.spaces:
             self._n_input_rgb = observation_space.spaces["rgb"].shape[2]
+            self.obs_size_rgb = observation_space.spaces["rgb"].shape
         else:
             self._n_input_rgb = 0
+            self.obs_size_rgb = 0
 
         if "depth" in observation_space.spaces:
             self._n_input_depth = observation_space.spaces["depth"].shape[2]
+            self.obs_size_depth = observation_space.spaces["depth"].shape
         else:
             self._n_input_depth = 0
+            self.obs_size_depth = 0
 
         # -- Create RedNet model
         cfg_rednet = {
@@ -188,15 +192,26 @@ class VisualRednetEncoder(nn.Module):
         for param in self.model_rednet.parameters():
             param.requires_grad = False
         self.model_rednet.eval()
+        self.model_rednet.to('cpu')
         
         self.model_rednet.cnn = nn.Sequential(
                 nn.Conv2d(
                     in_channels=self.model_rednet.inplanes,
-                    out_channels=32,
-                    kernel_size=8,
-                    stride=5,
+                    out_channels=64,
+                    kernel_size=8, 
+                    stride=4, 
+                    padding=3, 
+                    bias=False,
                 ),
                 nn.ReLU(True),
+                nn.Conv2d(
+                    in_channels=64,
+                    out_channels=32,
+                    kernel_size=4, 
+                    stride=2, 
+                    padding=1, 
+                    bias=False,
+                ),
             )
 
     def rename_weights(self, weights, device):
@@ -230,6 +245,15 @@ class VisualRednetEncoder(nn.Module):
         output = self.model_rednet(rgb_observations, depth_observations)
         feats = self.model_rednet.cnn(output)
         return feats
+    
+    @property
+    def _output_size(self):
+        s = (self.model_rednet.cnn(
+                    self.model_rednet(
+                        torch.rand(self.obs_size_rgb).unsqueeze(0).permute(0,3,1,2),
+                        torch.rand(self.obs_size_depth).unsqueeze(0).permute(0,3,1,2)))
+             .data.shape)
+        return s
 
 class VlnResnetDepthEncoder(nn.Module):
     def __init__(
