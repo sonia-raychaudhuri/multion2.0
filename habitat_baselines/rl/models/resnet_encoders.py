@@ -192,9 +192,9 @@ class VisualRednetEncoder(nn.Module):
         for param in self.model_rednet.parameters():
             param.requires_grad = False
         self.model_rednet.eval()
-        self.model_rednet.to('cpu')
+        #self.model_rednet.to('cpu')
         
-        self.model_rednet.cnn = nn.Sequential(
+        self.cnn = nn.Sequential(
                 nn.Conv2d(
                     in_channels=self.model_rednet.inplanes,
                     out_channels=64,
@@ -213,6 +213,7 @@ class VisualRednetEncoder(nn.Module):
                     bias=False,
                 ),
             )
+        self.cnn.to(device)
 
     def rename_weights(self, weights, device):
         names = list(weights.keys())
@@ -243,15 +244,15 @@ class VisualRednetEncoder(nn.Module):
             depth_observations = depth_observations.permute(0, 3, 1, 2)
 
         output = self.model_rednet(rgb_observations, depth_observations)
-        feats = self.model_rednet.cnn(output)
+        feats = self.cnn(output)
         return feats
     
     @property
     def _output_size(self):
-        s = (self.model_rednet.cnn(
+        s = (self.cnn(
                     self.model_rednet(
-                        torch.rand(self.obs_size_rgb).unsqueeze(0).permute(0,3,1,2),
-                        torch.rand(self.obs_size_depth).unsqueeze(0).permute(0,3,1,2)))
+                        torch.rand(self.obs_size_rgb).unsqueeze(0).permute(0,3,1,2).to(self.device),
+                        torch.rand(self.obs_size_depth).unsqueeze(0).permute(0,3,1,2).to(self.device)))
              .data.shape)
         return s
 
