@@ -688,10 +688,14 @@ class BaselineNetSemantic(Net):
 
         self.object_embedding = nn.Embedding(self.num_classes, object_category_embedding_size)
         
+        self.next_goal_map_linear = nn.Linear(
+            (self.local_map_size*self.local_map_size), 
+            self.linear_out)
+        
         self.state_encoder = RNNStateEncoder(
             (self._hidden_size           # visual_encoder
             + object_category_embedding_size    # goal_embedding
-            + (self.local_map_size*self.local_map_size)  # next goal map embedding
+            + self.linear_out  # next goal map embedding
             + (previous_action_embedding_size 
                 if self.use_previous_action else 0)    # action_embedding
             ), 
@@ -780,7 +784,7 @@ class BaselineNetSemantic(Net):
             next_goal_map = nn.Softmax()(next_goal_map)
 
             # linearize
-            next_goal_map_linear = self.flatten(next_goal_map)
+            next_goal_map_linear = self.next_goal_map_linear(self.flatten(next_goal_map))
 
             if self.use_previous_action:
                 action_embedding = self.action_embedding(prev_actions).squeeze(1)
@@ -810,7 +814,7 @@ class BaselineNetSemantic(Net):
             next_goal_map = nn.Softmax(dim=-1)(next_goal_map)
 
             # linearize
-            next_goal_map_linear = self.flatten(next_goal_map)
+            next_goal_map_linear = self.next_goal_map_linear(self.flatten(next_goal_map))
 
             if self.use_previous_action:
                 action_embedding = self.action_embedding(prev_actions).squeeze(1)

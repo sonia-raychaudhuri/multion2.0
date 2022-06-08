@@ -2414,38 +2414,40 @@ class PPOTrainerSemantic(PPOTrainer):
         for k, v in losses.items():
             writer.add_scalar(f"train/losses/{k}", v, self.num_steps_done)
             
-        # model histograms
-        writer.add_histogram(
-            "sem_map_encoder_cnn_0", self.actor_critic.net.sem_map_decoder.layer[0].weight, self.num_steps_done
-        )
-        writer.add_histogram(
-            "sem_map_encoder_cnn_1", self.actor_critic.net.sem_map_decoder.layer[3].weight, self.num_steps_done
-        )
-        writer.add_histogram(
-            "sem_map_encoder_cnn_2", self.actor_critic.net.sem_map_decoder.layer[6].weight, self.num_steps_done
-        )
-        writer.add_histogram(
-            "sem_map_decoder_cnn_0", self.actor_critic.net.sem_map_decoder.obj_layer[0].weight, self.num_steps_done
-        )
-        writer.add_histogram(
-            "sem_map_decoder_cnn_1", self.actor_critic.net.sem_map_decoder.obj_layer[3].weight, self.num_steps_done
-        )
-        
-        writer.add_histogram(
-            "action_embedding", self.actor_critic.net.action_embedding.weight, self.num_steps_done
-        )
-        writer.add_histogram(
-            "goal_embedding", self.actor_critic.net.object_embedding.weight, self.num_steps_done
-        )
-        writer.add_histogram(
-            "visual_encoder_cnn_0", self.actor_critic.net.visual_encoder.cnn[0].weight, self.num_steps_done
-        )
-        writer.add_histogram(
-            "visual_encoder_cnn_1", self.actor_critic.net.visual_encoder.cnn[2].weight, self.num_steps_done
-        )
-        writer.add_histogram(
-            "visual_encoder_linear", self.actor_critic.net.image_features_linear.weight, self.num_steps_done
-        )
+        # model histograms for debugging network learning
+        hist_frequency = 100
+        if (self.num_steps_done % hist_frequency) == 0:
+            writer.add_histogram(
+                "sem_map_encoder_cnn_0", self.actor_critic.net.sem_map_decoder.layer[0].weight, self.num_steps_done
+            )
+            writer.add_histogram(
+                "sem_map_encoder_cnn_1", self.actor_critic.net.sem_map_decoder.layer[3].weight, self.num_steps_done
+            )
+            writer.add_histogram(
+                "sem_map_encoder_cnn_2", self.actor_critic.net.sem_map_decoder.layer[6].weight, self.num_steps_done
+            )
+            writer.add_histogram(
+                "sem_map_decoder_cnn_0", self.actor_critic.net.sem_map_decoder.obj_layer[0].weight, self.num_steps_done
+            )
+            writer.add_histogram(
+                "sem_map_decoder_cnn_1", self.actor_critic.net.sem_map_decoder.obj_layer[3].weight, self.num_steps_done
+            )
+            
+            writer.add_histogram(
+                "action_embedding", self.actor_critic.net.action_embedding.weight, self.num_steps_done
+            )
+            writer.add_histogram(
+                "goal_embedding", self.actor_critic.net.object_embedding.weight, self.num_steps_done
+            )
+            writer.add_histogram(
+                "visual_encoder_cnn_0", self.actor_critic.net.visual_encoder.cnn[0].weight, self.num_steps_done
+            )
+            writer.add_histogram(
+                "visual_encoder_cnn_1", self.actor_critic.net.visual_encoder.cnn[2].weight, self.num_steps_done
+            )
+            writer.add_histogram(
+                "visual_encoder_linear", self.actor_critic.net.image_features_linear.weight, self.num_steps_done
+            )
         
 
         fps = self.num_steps_done / ((time.time() - self.t_start) + prev_time)

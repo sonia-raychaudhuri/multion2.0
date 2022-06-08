@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import torch
 import torch.nn as nn
@@ -33,7 +34,7 @@ class SemanticObjectDetector(nn.Module):
         for param in self.model.parameters():
             param.requires_grad = False
         self.model.eval()
-        self.model.to('cpu')
+        #self.model.to('cpu')
         #self.model.to(device)
         
         self.feature_extractor = self.get_feature_extractor()
@@ -42,7 +43,7 @@ class SemanticObjectDetector(nn.Module):
             param.requires_grad = False
         self.feature_extractor.eval()
         #self.feature_extractor.to(device)
-        self.feature_extractor.to('cpu')
+        #self.feature_extractor.to('cpu')
         
         self.cnn = nn.Sequential(
                 nn.Conv2d(
@@ -76,8 +77,8 @@ class SemanticObjectDetector(nn.Module):
 
     def get_object_detection_model(self, num_classes=9):
         # load a model pre-trained pre-trained on COCO
-        model = torchvision.models.detection.fasterrcnn_resnet50_fpn(
-            pretrained=True)
+        model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=False)
+        #model.load_state_dict(torch.load('data/pretrained_models/hub/checkpoints/fasterrcnn_resnet50_fpn_coco-258fb6c6.pth'))
 
         # get number of input features for the classifier
         in_features = model.roi_heads.box_predictor.cls_score.in_features
