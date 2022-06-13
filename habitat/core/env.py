@@ -328,7 +328,8 @@ class Env:
                     self._sim,
                     draw_border=False,
                     meters_per_pixel=self.meters_per_pixel,
-                    with_sampling=True
+                    with_sampling=True,
+                    num_samples=100
                 )
                 range_x = np.where(np.any(top_down_map, axis=1))[0]
                 range_y = np.where(np.any(top_down_map, axis=0))[0]
@@ -542,8 +543,8 @@ class Env:
             # Adding goal information on the map
             for i in range(len(self.current_episode.goals)):
                 goal_id = self.object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
-                if goal_id not in observations["semantic"]:
-                    continue
+                #if goal_id not in observations["semantic"]:
+                #    continue
                 
                 loc0 = self.current_episode.goals[i].position[0]
                 loc2 = self.current_episode.goals[i].position[2]
@@ -564,8 +565,8 @@ class Env:
                 num_distr = self._config["TASK"]["NUM_DISTRACTORS"] if self._config["TASK"]["NUM_DISTRACTORS"] > 0 else len(self.current_episode.distractors)
                 for i in range(num_distr):
                     distractor_id = self.object_to_datset_mapping[self.current_episode.distractors[i].object_category] + objIndexOffset
-                    if distractor_id not in observations["semantic"]:
-                        continue
+                 #   if distractor_id not in observations["semantic"]:
+                  #      continue
                     
                     loc0 = self.current_episode.distractors[i].position[0]
                     loc2 = self.current_episode.distractors[i].position[2]
@@ -613,7 +614,7 @@ class Env:
             # agent is on bottom center
             ego_map_mid = (self.egocentric_map_size//2)
             sem_map = patch[cropped_map_mid-ego_map_mid:cropped_map_mid+ego_map_mid+1, 
-                            cropped_map_mid-1:cropped_map_mid+self.egocentric_map_size, 1]
+                            cropped_map_mid-1:cropped_map_mid+self.egocentric_map_size, 0]
             
             # occ_map = patch[cropped_map_mid-ego_map_mid:cropped_map_mid+ego_map_mid+1, 
             #                 cropped_map_mid-1:cropped_map_mid+self.egocentric_map_size, 0]
@@ -779,50 +780,6 @@ class Env:
             else:
                 observations["objectCat"] = 0
         elif self._config.TRAINER_NAME in ["semantic"]:
-            channel_num = 1
-            objIndexOffset = 1
-
-            # Adding goal information on the map
-            for i in range(len(self.current_episode.goals)):
-                goal_id = self.object_to_datset_mapping[self.current_episode.goals[i].object_category] + objIndexOffset
-                if goal_id not in observations["semantic"]:
-                    continue
-                
-                loc0 = self.current_episode.goals[i].position[0]
-                loc2 = self.current_episode.goals[i].position[2]
-                #grid_loc = self.conv_grid(loc0, loc2)
-                grid_loc = maps.to_grid(
-                    loc2,
-                    loc0,
-                    self.currMap.shape[0:2],
-                    sim=self._sim,
-                )
-                self.currMap[
-                    grid_loc[0]-1:grid_loc[0]+2, 
-                    grid_loc[1]-1:grid_loc[1]+2, 
-                    channel_num] = goal_id
-                
-            if self._config["TASK"]["INCLUDE_DISTRACTORS"]:
-                # Adding distractor information on the map
-                num_distr = self._config["TASK"]["NUM_DISTRACTORS"] if self._config["TASK"]["NUM_DISTRACTORS"] > 0 else len(self.current_episode.distractors)
-                for i in range(num_distr):
-                    distractor_id = self.object_to_datset_mapping[self.current_episode.distractors[i].object_category] + objIndexOffset
-                    if distractor_id not in observations["semantic"]:
-                        continue
-                    
-                    loc0 = self.current_episode.distractors[i].position[0]
-                    loc2 = self.current_episode.distractors[i].position[2]
-                    #grid_loc = self.conv_grid(loc0, loc2)
-                    grid_loc = maps.to_grid(
-                        loc2,
-                        loc0,
-                        self.currMap.shape[0:2],
-                        sim=self._sim,
-                    )
-                    self.currMap[grid_loc[0]-1:grid_loc[0]+2, 
-                                 grid_loc[1]-1:grid_loc[1]+2, 
-                                 channel_num] = distractor_id
-
             currPix = maps.to_grid(
                     observations["agent_position"][2],
                     observations["agent_position"][0],
@@ -856,10 +813,10 @@ class Env:
             # agent is on bottom center
             ego_map_mid = (self.egocentric_map_size//2)
             sem_map = patch[cropped_map_mid-ego_map_mid:cropped_map_mid+ego_map_mid+1, 
-                            cropped_map_mid-1:cropped_map_mid+self.egocentric_map_size, 1]
-            
-            occ_map = patch[cropped_map_mid-ego_map_mid:cropped_map_mid+ego_map_mid+1, 
                             cropped_map_mid-1:cropped_map_mid+self.egocentric_map_size, 0]
+            
+            #occ_map = patch[cropped_map_mid-ego_map_mid:cropped_map_mid+ego_map_mid+1, 
+            #                cropped_map_mid-1:cropped_map_mid+self.egocentric_map_size, 0]
             
             # Image.fromarray(
             #     maps.colorize_topdown_map(

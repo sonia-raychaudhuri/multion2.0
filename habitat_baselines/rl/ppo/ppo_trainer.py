@@ -2627,7 +2627,7 @@ class PPOTrainerSemantic(PPOTrainer):
                         value_loss=value_loss,
                         action_loss=action_loss,
                         semantic_map_loss=semantic_map_loss,
-                        next_goal_map_loss=next_goal_map_loss,
+                        #next_goal_map_loss=next_goal_map_loss,
                         entropy=dist_entropy,
                     ),
                     count_steps_delta,
