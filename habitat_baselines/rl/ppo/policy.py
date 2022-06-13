@@ -777,7 +777,7 @@ class BaselineNetSemantic(Net):
             sem_goal_map_feats, sem_goal_map = self.sem_map_decoder(final_retrieval)
 
             # linearize
-            map_linear = self.map_linear(self.flatten(sem_goal_map_feats))
+            map_linear = self.map_linear(self.flatten(sem_goal_map))
 
             if self.use_previous_action:
                 action_embedding = self.action_embedding(prev_actions).squeeze(1)
@@ -800,7 +800,7 @@ class BaselineNetSemantic(Net):
             sem_goal_map_feats, sem_goal_map = self.sem_map_decoder(final_retrieval.permute(0,3,1,2))
 
             # linearize
-            map_linear = self.map_linear(self.flatten(sem_goal_map_feats))
+            map_linear = self.map_linear(self.flatten(sem_goal_map))
 
             if self.use_previous_action:
                 action_embedding = self.action_embedding(prev_actions).squeeze(1)
