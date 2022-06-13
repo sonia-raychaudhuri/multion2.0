@@ -689,7 +689,7 @@ class BaselineNetSemantic(Net):
         self.object_embedding = nn.Embedding(self.num_classes, object_category_embedding_size)
         
         self.map_linear = nn.Linear(
-            (self.local_map_size*self.local_map_size), 
+            (self.local_map_size*self.local_map_size*self.num_occ_classes), 
             self.linear_out)
         
         self.state_encoder = RNNStateEncoder(
