@@ -188,7 +188,7 @@ class PolicySemantic(nn.Module):
         action_log_probs = distribution.log_probs(action)
 
         return (value, action, action_log_probs, rnn_hidden_states, 
-                global_map)
+                global_map, sem_goal_map, next_goal_map)
 
     def get_value(self, observations, rnn_hidden_states, global_map, prev_actions, masks):
         features, _, _, _, _ = self.net(

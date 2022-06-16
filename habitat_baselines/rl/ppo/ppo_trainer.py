@@ -2798,8 +2798,8 @@ class PPOTrainerSemantic(PPOTrainer):
                     _,
                     test_recurrent_hidden_states,
                     test_global_map,
-                    semantic_map,
-                    next_goal_map, 
+                    sem_goal_map, 
+                    next_goal_map
                 ) = self.actor_critic.act(
                     batch,
                     test_recurrent_hidden_states,
@@ -2878,9 +2878,8 @@ class PPOTrainerSemantic(PPOTrainer):
                             {k: v[i] for k, v in batch.items()}, 
                             info=infos[i],
                             action=actions[i],
-                            global_map=test_global_map[i],
-                            semantic_map=semantic_map[i],
-                            next_goal_map=next_goal_map[i],
+                            projected_features=test_global_map[i],
+                            global_map=sem_goal_map[i].permute(1,2,0)
                         )
                         txt_to_show = ('Action: '+ str(actions[i].item()) + 
                                     '; Dist_to_multi_goal:' + str(round(infos[i]['distance_to_multi_goal'],2)) + 
@@ -2914,9 +2913,8 @@ class PPOTrainerSemantic(PPOTrainer):
                         {k: v[i] for k, v in batch.items()}, 
                         info=infos[i],
                         action=actions[i],
-                        global_map=test_global_map[i],
-                        semantic_map=semantic_map[i],
-                        next_goal_map=next_goal_map[i],
+                        projected_features=test_global_map[i],
+                        global_map=sem_goal_map[i].permute(1,2,0)
                     )
                     txt_to_show = ('Action: '+ str(actions[i].item()) + 
                                 '; Dist_to_multi_goal:' + str(round(infos[i]['distance_to_multi_goal'],2)) + 
